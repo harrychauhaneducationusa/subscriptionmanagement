@@ -18,10 +18,10 @@ The current architecture overview lives inside `../../BRD.md`, including:
 - `solution-architecture.md` - target architecture recommendation for SubSense AI
 - `frontend-delivery-strategy.md` - frontend and channel strategy for the web-first MVP
 - `data-model-overview.md` - high-level fintech domain and entity model
+- `integration-landscape.md` - external system boundaries, provider responsibilities, and fallback design
 
 ## Suggested future additions
 
-- `integration-landscape.md`
 - `security-and-compliance-controls.md`
 - `ai-governance.md`
 
