@@ -5,6 +5,7 @@ This repository contains the product strategy artifact for **SubSense AI**, an A
 ## Contents
 
 - `canvases/subsense-ai-brd.canvas.tsx` - the full enterprise-grade Business Requirements Document authored as a Cursor canvas
+- `BRD.md` - browser-friendly Markdown version of the Business Requirements Document for GitHub viewing
 
 ## What the BRD covers
 
@@ -19,4 +20,6 @@ This repository contains the product strategy artifact for **SubSense AI**, an A
 
 ## Viewing the BRD
 
-The canonical artifact is the canvas file under `canvases/`. Open it in Cursor to review the structured, interactive document layout.
+For browser and GitHub viewing, open `BRD.md`.
+
+For the structured interactive version inside Cursor, open `canvases/subsense-ai-brd.canvas.tsx`.
