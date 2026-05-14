@@ -20,10 +20,7 @@ The current architecture overview lives inside `../../BRD.md`, including:
 - `data-model-overview.md` - high-level fintech domain and entity model
 - `integration-landscape.md` - external system boundaries, provider responsibilities, and fallback design
 - `security-and-compliance-controls.md` - launch-ready control framework for trust, privacy, consent, and auditability
-
-## Suggested future additions
-
-- `ai-governance.md`
+- `ai-governance.md` - rules and guardrails for grounded, safe, evidence-backed AI usage
 
 ## Purpose
 
