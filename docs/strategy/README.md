@@ -2,6 +2,10 @@
 
 This section is for business planning and market-facing strategy artifacts related to SubSense AI.
 
+## Current documents
+
+- `positioning-and-messaging.md` - category framing, differentiation, message hierarchy, and channel-ready narrative guidance
+
 ## Strategy themes covered by the BRD today
 
 - market opportunity
