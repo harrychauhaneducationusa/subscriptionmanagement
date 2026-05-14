@@ -2,6 +2,10 @@
 
 This section is for supporting repository references and lightweight guidance documents.
 
+## Current documents
+
+- `api-and-data-contracts.md` - implementation-facing API, entity, state, webhook, and async contract guidance
+
 ## Suggested future additions
 
 - `repo-map.md`
