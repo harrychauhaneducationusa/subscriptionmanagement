@@ -17,11 +17,12 @@ The current MVP assumption is a **mobile-optimized responsive web application**,
 - `mvp-web-scope.md` - phase-1 scope for the mobile-optimized responsive web MVP
 - `epics-and-stories.md` - delivery-ready epic and story breakdown for the MVP
 - `user-journeys.md` - end-to-end user flows for onboarding, dashboard activation, and recurring management
+- `phase-1-milestones.md` - milestone-based release sequencing for the MVP
 
 ## Suggested future additions
 
 - `personas.md` - condensed persona pack for product and design teams
-- `phase-1-milestones.md` - milestone-level sequencing derived from the epic plan
+- `acceptance-checklists.md` - launch-readiness checklist package by function
 
 ## Scope of this section
 
