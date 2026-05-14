@@ -13,11 +13,11 @@ The current MVP assumption is a **mobile-optimized responsive web application**,
 ## Current documents
 
 - `../../BRD.md` - master Business Requirements Document for SubSense AI
+- `PRD.md` - execution-ready Product Requirements Document for the phase-1 MVP
 - `mvp-web-scope.md` - phase-1 scope for the mobile-optimized responsive web MVP
 
 ## Suggested future additions
 
-- `PRD.md` - implementation-oriented Product Requirements Document
 - `personas.md` - condensed persona pack for product and design teams
 - `user-journeys.md` - end-to-end flows for onboarding, dashboard, and savings actions
 - `epics-and-stories.md` - delivery-ready breakdown for engineering and product
