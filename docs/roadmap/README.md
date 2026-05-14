@@ -6,10 +6,14 @@ This section is for delivery planning and phased execution artifacts.
 
 The phased delivery model currently lives in `../../BRD.md`, covering:
 
-- MVP phase
-- growth phase
-- AI evolution
+- mobile-optimized web MVP phase
+- growth and web refinement phase
+- AI evolution and native expansion decision phase
 - B2B API phase
+
+Additional roadmap guidance now includes:
+
+- `native-app-trigger-criteria.md` - measurable and qualitative criteria for deciding whether to build native apps after MVP validation
 
 ## Suggested future additions
 
@@ -28,3 +32,4 @@ Use this folder for documents that turn the product vision into a practical deli
 - dependencies
 - ownership assumptions
 - release readiness criteria
+- evidence-based channel expansion decisions

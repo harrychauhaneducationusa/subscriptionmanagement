@@ -7,6 +7,7 @@ This section is for business-facing and solution architecture documentation.
 The current architecture overview lives inside `../../BRD.md`, including:
 
 - platform structure
+- mobile-optimized web MVP delivery model
 - recurring detection engine concepts
 - AI orchestration approach
 - bank aggregation model
@@ -15,6 +16,7 @@ The current architecture overview lives inside `../../BRD.md`, including:
 ## Suggested future additions
 
 - `solution-architecture.md`
+- `frontend-delivery-strategy.md`
 - `integration-landscape.md`
 - `data-model-overview.md`
 - `security-and-compliance-controls.md`

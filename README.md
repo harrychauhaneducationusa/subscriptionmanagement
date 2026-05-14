@@ -2,6 +2,8 @@
 
 This repository contains the product strategy artifact for **SubSense AI**, an AI-powered subscription intelligence and recurring expense management platform.
 
+The current documented MVP direction is a **mobile-optimized responsive web application** first, with native mobile apps evaluated after the core product proves retention and channel fit.
+
 ## Contents
 
 - `docs/README.md` - documentation index for navigating product, strategy, architecture, roadmap, and reference materials

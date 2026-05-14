@@ -5,7 +5,7 @@
 **Document Type:** Enterprise Business Requirements Document  
 **Product:** SubSense AI  
 **Product Category:** AI-powered subscription intelligence and recurring expense management platform  
-**Primary Channels:** Mobile-first application with supporting web surfaces and partner APIs  
+**Primary Channels:** Mobile-optimized web MVP, later native mobile applications, and partner APIs  
 **Launch Market:** India  
 **Expansion Horizon:** Global  
 
@@ -63,7 +63,7 @@ Consumers lose money and control due to subscription sprawl, hidden recurring ch
 
 ### Market opportunity
 
-The market gap sits between generic budgeting tools and wealth apps on one side, and narrow cancellation or bill-negotiation tools on the other. There is a clear opportunity for a premium, mobile-first, AI-enhanced recurring-spend platform localized for India and extensible globally.
+The market gap sits between generic budgeting tools and wealth apps on one side, and narrow cancellation or bill-negotiation tools on the other. There is a clear opportunity for a premium, mobile-optimized web-first, AI-enhanced recurring-spend platform localized for India and extensible globally.
 
 ### Solution overview
 
@@ -76,6 +76,19 @@ SubSense AI will:
 - detect duplicates and low-value subscriptions
 - generate actionable financial insights and savings recommendations
 - provide a clear recurring-spend dashboard and alerting system
+
+### MVP delivery model
+
+The initial product should launch as a **mobile-optimized responsive web application**, optionally enhanced with PWA behaviors where practical, rather than as a native mobile app in phase one.
+
+This channel choice supports the product strategy because:
+
+- the core MVP workflows are onboarding, bank linking, recurring detection, dashboard review, manual setup, and savings insights
+- these workflows do not require native-only device capabilities
+- web delivery shortens iteration cycles and reduces app-store dependency during early learning
+- mobile-browser distribution makes pilot access, demos, and early partnership rollout easier
+
+The product experience should still be designed **mobile-first**, with phone-sized layouts, touch-first interactions, and premium fintech visual quality from day one.
 
 ### Competitive advantage
 
@@ -304,6 +317,19 @@ This is a strong value-first foundation and should be preserved, but expanded in
 - Provide next-step prompts: confirm detected items, invite family, add missing bills
 
 **UX rationale:** The first dashboard must create clarity and control immediately.
+
+### MVP channel execution model
+
+For MVP, the onboarding and dashboard journey should be executed through a responsive web application optimized primarily for mobile browsers.
+
+This means:
+
+- mobile screens are the primary design breakpoint
+- desktop web is supported as a secondary review surface
+- OTP, consent, dashboard, and manual-entry flows must be fully usable inside a mobile browser
+- browser performance and responsive behavior matter more than native polish in phase one
+
+Native apps should be treated as a later packaging and retention upgrade, not as a dependency for validating the initial product-market fit.
 
 ### Psychological onboarding principles
 
@@ -1135,6 +1161,7 @@ Household intelligence creates a defensible moat because recurring spend often b
 - premium fintech look and feel
 - drill-down depth without initial overload
 - clear action entry points from every major widget
+- mobile-browser-first responsiveness for MVP deployment
 
 ---
 
@@ -1280,7 +1307,7 @@ The platform should be modular so that recurring intelligence can serve:
 
 | Layer | Responsibilities |
 |---|---|
-| Experience layer | Mobile app, web dashboard, partner-facing UI modules |
+| Experience layer | Mobile-optimized responsive web app, secondary desktop web access, later native mobile apps, partner-facing UI modules |
 | Integration layer | Setu AA, notifications, partner feeds, merchant intelligence sources |
 | Core domain layer | Identity, household, subscription, utility, consent, recommendation, notification logic |
 | Data and intelligence layer | Transaction normalization, merchant graph, recurring detection, analytics warehouse, AI orchestration |
@@ -1288,9 +1315,30 @@ The platform should be modular so that recurring intelligence can serve:
 
 ### Frontend overview
 
-- mobile-first native or cross-platform experience
-- responsive web for browser review, support, and growth pages
+- mobile-browser-first responsive web application for MVP
+- desktop-responsive web for investor, partner, and user convenience
+- optional PWA enhancements where they improve installability or repeat access
+- native iOS and Android applications introduced after MVP learning justifies channel expansion
 - premium design system for consistency across analytics-heavy views
+
+### MVP web scope and deferred native capabilities
+
+The MVP web application should fully support:
+
+- onboarding, OTP authentication, and draft continuation
+- household setup and memberless shared-plan configuration
+- Account Aggregator-based bank-linking and consent journeys
+- recurring detection review, manual subscription entry, and utility setup
+- dashboard analytics, insight feed, renewal calendar, and savings recommendations
+- in-app notification center and email-based reminder support
+
+The following capabilities may be explicitly deferred until later native-app phases if they are not essential to MVP validation:
+
+- app-store distribution
+- device-native push-heavy retention mechanics beyond browser and email support
+- deeper biometric convenience layers
+- richer offline behavior
+- advanced installability and home-screen packaging
 
 ### Backend overview
 
@@ -1361,11 +1409,31 @@ Should include:
 
 | Stage | Product posture | Platform focus | Strategic unlock |
 |---|---|---|---|
-| MVP | Consumer recurring-spend visibility and savings suggestions | Strong core data model and reliable automation | Product-market fit validation |
-| Growth | Household analytics, benchmarking, richer notifications | Horizontal scaling of ingestion and analytics | Retention and premium conversion |
-| AI evolution | Personalized insights and multilingual assistance | Model governance and feedback loops | Premium moat and stronger engagement |
+| MVP | Mobile-optimized web app delivering recurring-spend visibility and savings suggestions | Strong core data model, reliable automation, and responsive browser UX | Product-market fit validation |
+| Growth | Household analytics, benchmarking, richer notifications, and web experience refinement | Horizontal scaling of ingestion and analytics plus stronger engagement loops | Retention and premium conversion |
+| AI evolution | Personalized insights, multilingual assistance, and native-readiness evaluation | Model governance, feedback loops, and packaging decisions for repeat-use cohorts | Premium moat and stronger engagement |
 | B2B API platform | Reusable recurring-intelligence services for partners | Tenant isolation and SLA-backed APIs | Enterprise revenue and distribution |
 | Embedded finance future | Action orchestration and partner-led optimization | Workflow engines and settlement/compliance capabilities | Full recurring-expense operating platform |
+
+### Native application trigger criteria
+
+Native mobile applications should be prioritized only when at least two or three of the following conditions are clearly true:
+
+- reminders and notifications become the primary retention engine
+- users demonstrate repeat weekly or higher-frequency product usage that justifies app installation
+- app-store presence materially improves acquisition trust or conversion
+- roadmap priorities require device-native behaviors that mobile web handles poorly
+- product metrics show strong enough activation and retention that channel expansion is likely to compound, not distract
+
+Suggested decision-support metrics for this evaluation include:
+
+| Metric | Indicative threshold for native consideration | Why it matters |
+|---|---|---|
+| D30 retention for activated users | 35% to 40% or better | Suggests the product has moved beyond one-time utility behavior |
+| WAU / MAU | 0.45 or higher | Indicates recurring interaction strong enough for installation convenience to matter |
+| Mobile-browser session share | 70% or higher | Confirms that mobile is the dominant engagement channel |
+| Alert-driven return rate | Consistently strong re-entry from reminders and renewals | Suggests retention may improve with native notification mechanics |
+| Premium conversion trend | Stable uplift among repeat-use cohorts | Indicates channel expansion may monetize and retain efficiently |
 
 ---
 
@@ -1420,9 +1488,9 @@ The biggest long-term risk is not technical complexity alone. It is failing to b
 
 | Phase | Timeline | Primary scope | Dependencies | Exit criteria |
 |---|---|---|---|---|
-| Phase 1: MVP | 4 to 6 months | Onboarding, auth, household setup, manual entry, AA linking, recurring detection, dashboard, reminders, basic savings engine | Design system, transaction model, Setu AA, notifications | Users can see recurring spend and act on at least one recommendation |
-| Phase 2: Growth | 6 to 9 months from MVP start | Household invites, shared analytics, duplicate refinement, premium plans, richer alerts | Permissions, paywall, benchmark preparation | Premium monetization and household value are validated |
-| Phase 3: AI platform | 9 to 12 months from MVP start | Assistant, richer insights, budget intelligence, multilingual support | Retrieval, safety, feedback systems | AI measurably improves engagement and retention |
+| Phase 1: MVP | 4 to 6 months | Mobile-optimized responsive web app with onboarding, auth, household setup, manual entry, AA linking, recurring detection, dashboard, browser-first reminders, and basic savings engine | Design system, transaction model, Setu AA, notifications, responsive frontend foundation | Users can access the product on mobile web, see recurring spend, and act on at least one recommendation |
+| Phase 2: Growth | 6 to 9 months from MVP start | Household invites, shared analytics, duplicate refinement, premium plans, richer alerts, and web experience refinement | Permissions, paywall, benchmark preparation, retention instrumentation | Premium monetization and household value are validated, with retention strong enough to assess native-app expansion |
+| Phase 3: AI platform and native expansion decision | 9 to 12 months from MVP start | Assistant, richer insights, budget intelligence, multilingual support, and go or no-go decision on native app packaging | Retrieval, safety, feedback systems, retention data, channel economics | AI measurably improves engagement and the team has enough evidence to justify or defer native apps |
 | Phase 4: B2B APIs | 12 to 18 months from MVP start | Partner APIs, white-label widgets, enterprise reporting | Tenant isolation, SLA layer, contracts | At least one successful external partner deployment |
 
 ### Priority rationale
@@ -1503,4 +1571,4 @@ SubSense AI will be considered successful when:
 
 SubSense AI is positioned to occupy a differentiated space at the intersection of subscription management, household expense intelligence, and AI-assisted financial optimization. Its success depends on solving a real and growing recurring-spend pain point with a product that feels premium, accurate, privacy-respecting, and action-oriented from day one.
 
-The correct product strategy is to launch with deterministic trust, mobile-first value delivery, and India-specific integration strength, then expand into household intelligence, AI personalization, and eventually a reusable recurring-intelligence platform for B2B partners.
+The correct product strategy is to launch with deterministic trust, mobile-browser-first delivery, and India-specific integration strength, then expand into household intelligence, AI personalization, and later native mobile packaging only when retention and channel economics justify it, before ultimately building a reusable recurring-intelligence platform for B2B partners.

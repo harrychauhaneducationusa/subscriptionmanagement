@@ -2,6 +2,14 @@
 
 This `docs/` directory organizes the SubSense AI product documentation into review-friendly sections for GitHub and future collaboration.
 
+## Current platform direction
+
+The current product direction is:
+
+- **Phase 1:** mobile-optimized responsive web MVP
+- **Phase 2:** web refinement plus stronger retention mechanics
+- **Phase 3:** native mobile packaging only if usage and channel economics justify it
+
 ## Start here
 
 - `../BRD.md` - the complete browser-readable Business Requirements Document
