@@ -19,10 +19,10 @@ The current architecture overview lives inside `../../BRD.md`, including:
 - `frontend-delivery-strategy.md` - frontend and channel strategy for the web-first MVP
 - `data-model-overview.md` - high-level fintech domain and entity model
 - `integration-landscape.md` - external system boundaries, provider responsibilities, and fallback design
+- `security-and-compliance-controls.md` - launch-ready control framework for trust, privacy, consent, and auditability
 
 ## Suggested future additions
 
-- `security-and-compliance-controls.md`
 - `ai-governance.md`
 
 ## Purpose
