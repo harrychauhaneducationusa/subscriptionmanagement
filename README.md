@@ -4,6 +4,7 @@ This repository contains the product strategy artifact for **SubSense AI**, an A
 
 ## Contents
 
+- `docs/README.md` - documentation index for navigating product, strategy, architecture, roadmap, and reference materials
 - `canvases/subsense-ai-brd.canvas.tsx` - the full enterprise-grade Business Requirements Document authored as a Cursor canvas
 - `BRD.md` - browser-friendly Markdown version of the Business Requirements Document for GitHub viewing
 
@@ -23,3 +24,5 @@ This repository contains the product strategy artifact for **SubSense AI**, an A
 For browser and GitHub viewing, open `BRD.md`.
 
 For the structured interactive version inside Cursor, open `canvases/subsense-ai-brd.canvas.tsx`.
+
+For the broader repository documentation structure, start with `docs/README.md`.
