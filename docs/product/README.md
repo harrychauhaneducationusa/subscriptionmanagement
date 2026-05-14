@@ -19,10 +19,7 @@ The current MVP assumption is a **mobile-optimized responsive web application**,
 - `user-journeys.md` - end-to-end user flows for onboarding, dashboard activation, and recurring management
 - `phase-1-milestones.md` - milestone-based release sequencing for the MVP
 - `acceptance-checklists.md` - launch-readiness checklist package by function
-
-## Suggested future additions
-
-- `personas.md` - condensed persona pack for product and design teams
+- `personas.md` - target-segment persona pack for product, UX, messaging, and prioritization
 
 ## Scope of this section
 
