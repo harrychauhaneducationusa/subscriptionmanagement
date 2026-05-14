@@ -5,6 +5,7 @@ This section is for business planning and market-facing strategy artifacts relat
 ## Current documents
 
 - `positioning-and-messaging.md` - category framing, differentiation, message hierarchy, and channel-ready narrative guidance
+- `pricing-and-packaging.md` - plan ladder, monetization guardrails, free-to-paid boundaries, and future entitlement guidance
 
 ## Strategy themes covered by the BRD today
 
@@ -19,7 +20,6 @@ This section is for business planning and market-facing strategy artifacts relat
 
 - `competitive-matrix.md`
 - `go-to-market.md`
-- `pricing-and-packaging.md`
 - `partnership-strategy.md`
 - `investor-summary.md`
 
