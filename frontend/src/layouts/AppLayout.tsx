@@ -11,6 +11,7 @@ import {
 } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
+import type { Breakpoint } from '@mui/material/styles'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { clearStoredSession, getStoredSession } from '../lib/session'
@@ -21,7 +22,12 @@ type UnreadSummaryResponse = {
   }
 }
 
-export function AppLayout({ children }: PropsWithChildren) {
+type AppLayoutProps = PropsWithChildren<{
+  /** Default keeps app screens mobile-narrow; use `lg` on Ops for wide tables. */
+  maxContainerWidth?: Breakpoint | false
+}>
+
+export function AppLayout({ children, maxContainerWidth = 'sm' }: AppLayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const session = getStoredSession()
@@ -115,7 +121,7 @@ export function AppLayout({ children }: PropsWithChildren) {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="sm" sx={{ pb: 8, pt: 2.5 }}>
+      <Container maxWidth={maxContainerWidth} sx={{ pb: 8, pt: 2.5 }}>
         <Stack spacing={2.5}>{children}</Stack>
       </Container>
     </Box>

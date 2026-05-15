@@ -1,5 +1,16 @@
 import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded'
-import { Alert, Card, CardContent, Chip, Stack, Typography } from '@mui/material'
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
+  Stack,
+  Typography,
+} from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { api } from '../lib/api'
@@ -28,6 +39,9 @@ const internalOpsToken =
     ? import.meta.env.VITE_INTERNAL_OPS_TOKEN
     : ''
 
+const funnelEntries = (analytics: Record<string, number>) =>
+  Object.entries(analytics).sort(([a], [b]) => a.localeCompare(b))
+
 export function OpsPage() {
   const session = getStoredSession()
 
@@ -47,38 +61,66 @@ export function OpsPage() {
     return <Navigate replace to="/session" />
   }
 
+  const entries = launchQuery.data ? funnelEntries(launchQuery.data.analytics) : []
+  const midpoint = Math.ceil(entries.length / 2)
+  const leftColumn = entries.slice(0, midpoint)
+  const rightColumn = entries.slice(midpoint)
+
   return (
-    <AppLayout>
+    <AppLayout maxContainerWidth="lg">
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
-            <Chip
-              color="secondary"
-              icon={<AssessmentRoundedIcon />}
-              label="M6 internal launch readiness"
-              sx={{ alignSelf: 'flex-start' }}
-            />
+            <Stack direction="row" sx={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
+              <Chip
+                color="secondary"
+                icon={<AssessmentRoundedIcon />}
+                label="M6 internal launch readiness"
+                sx={{ alignSelf: 'flex-start' }}
+              />
+              <Button
+                disabled={launchQuery.isFetching}
+                onClick={() => void launchQuery.refetch()}
+                size="small"
+                startIcon={<RefreshRoundedIcon />}
+                variant="outlined"
+              >
+                {launchQuery.isFetching ? 'Refreshing…' : 'Refresh snapshot'}
+              </Button>
+            </Stack>
+
             <Typography variant="h2">Operations and funnel snapshot</Typography>
-            <Typography color="text.secondary" variant="body2">
-              Aggregate product analytics and queue depth for internal demos. In production, set{' '}
-              <Typography component="span" sx={{ fontFamily: 'monospace' }} variant="body2">
-                INTERNAL_OPS_TOKEN
-              </Typography>{' '}
-              on the API and{' '}
-              <Typography component="span" sx={{ fontFamily: 'monospace' }} variant="body2">
-                VITE_INTERNAL_OPS_TOKEN
-              </Typography>{' '}
-              in the web build so the browser sends matching{' '}
-              <Typography component="span" sx={{ fontFamily: 'monospace' }} variant="body2">
-                x-internal-ops-token
-              </Typography>
-              .
+
+            <Typography color="text.secondary" component="div" variant="body2">
+              Funnel event counts (from <Box component="span" sx={{ fontFamily: 'monospace' }}>analytics_events</Box>
+              ), notification row totals, and worker queue depth. Scroll this page for{' '}
+              <strong>notifications</strong> and <strong>queues</strong> — they sit below the funnel list.
             </Typography>
+
+            {import.meta.env.PROD ? (
+              <Alert severity="warning" variant="outlined">
+                <Typography component="div" variant="body2">
+                  Production: set matching <Box component="span" sx={{ fontFamily: 'monospace' }}>INTERNAL_OPS_TOKEN</Box>{' '}
+                  (API) and <Box component="span" sx={{ fontFamily: 'monospace' }}>VITE_INTERNAL_OPS_TOKEN</Box> (web build)
+                  so requests send <Box component="span" sx={{ fontFamily: 'monospace' }}>x-internal-ops-token</Box>.
+                </Typography>
+              </Alert>
+            ) : (
+              <Alert severity="info" variant="outlined">
+                <Typography component="div" variant="body2">
+                  Development: if <Box component="span" sx={{ fontFamily: 'monospace' }}>INTERNAL_OPS_TOKEN</Box> is set
+                  in <Box component="span" sx={{ fontFamily: 'monospace' }}>.env</Box>, use the same value for{' '}
+                  <Box component="span" sx={{ fontFamily: 'monospace' }}>VITE_INTERNAL_OPS_TOKEN</Box> and restart{' '}
+                  <Box component="span" sx={{ fontFamily: 'monospace' }}>npm run dev</Box> so Vite embeds it.
+                </Typography>
+              </Alert>
+            )}
 
             {launchQuery.isError ? (
               <Alert severity="error">
-                Could not load launch readiness. If you are in production, configure the shared ops
-                token on both API and frontend, then reload.
+                Could not load launch readiness. If the API requires an ops token, align{' '}
+                <Box component="span" sx={{ fontFamily: 'monospace' }}>INTERNAL_OPS_TOKEN</Box> and{' '}
+                <Box component="span" sx={{ fontFamily: 'monospace' }}>VITE_INTERNAL_OPS_TOKEN</Box>, then restart dev servers.
               </Alert>
             ) : null}
 
@@ -88,54 +130,85 @@ export function OpsPage() {
 
             {launchQuery.data ? (
               <>
+                <Typography color="text.secondary" variant="caption">
+                  Last fetched: {new Date(launchQuery.dataUpdatedAt).toLocaleString()}
+                </Typography>
+
                 <Alert severity={launchQuery.data.status === 'healthy' ? 'success' : 'warning'}>
                   Overall status: {launchQuery.data.status}. Database: {launchQuery.data.services.database}. Redis:{' '}
                   {launchQuery.data.services.redis}.
                 </Alert>
 
                 <Typography sx={{ fontWeight: 700 }} variant="subtitle1">
-                  Product funnel counts
+                  Product funnel counts ({entries.length} metrics)
                 </Typography>
-                <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
-                  {Object.entries(launchQuery.data.analytics)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([name, count]) => (
+
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ alignItems: 'flex-start' }}>
+                  <Stack component="ul" spacing={0.5} sx={{ flex: 1, m: 0, minWidth: 0, pl: 2.5 }}>
+                    {leftColumn.map(([name, count]) => (
                       <Typography key={name} component="li" color="text.secondary" variant="body2">
-                        <Typography component="span" sx={{ fontFamily: 'monospace' }} variant="body2">
+                        <Box component="span" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
                           {name}
-                        </Typography>
+                        </Box>
                         : {count}
                       </Typography>
                     ))}
+                  </Stack>
+                  <Stack component="ul" spacing={0.5} sx={{ flex: 1, m: 0, minWidth: 0, pl: 2.5 }}>
+                    {rightColumn.map(([name, count]) => (
+                      <Typography key={name} component="li" color="text.secondary" variant="body2">
+                        <Box component="span" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {name}
+                        </Box>
+                        : {count}
+                      </Typography>
+                    ))}
+                  </Stack>
                 </Stack>
+
+                <Divider />
 
                 <Typography sx={{ fontWeight: 700 }} variant="subtitle1">
                   Notifications (operational)
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  Total rows: {launchQuery.data.notifications.total}. In-app unread-style sent count:{' '}
+                  Total rows: {launchQuery.data.notifications.total}. In-app &quot;sent&quot; (unread-style) count:{' '}
                   {launchQuery.data.notifications.unread}.
                 </Typography>
-                <Typography
-                  color="text.secondary"
+                <Box
                   component="pre"
-                  sx={{ fontFamily: 'monospace', fontSize: 12, overflow: 'auto' }}
-                  variant="body2"
+                  sx={{
+                    bgcolor: 'action.hover',
+                    borderRadius: 1,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    maxHeight: 220,
+                    overflow: 'auto',
+                    p: 1.5,
+                  }}
                 >
                   {JSON.stringify(launchQuery.data.notifications.byChannel, null, 2)}
-                </Typography>
+                </Box>
+
+                <Divider />
 
                 <Typography sx={{ fontWeight: 700 }} variant="subtitle1">
-                  Queues
+                  Queues (BullMQ)
                 </Typography>
-                <Typography
-                  color="text.secondary"
+                <Box
                   component="pre"
-                  sx={{ fontFamily: 'monospace', fontSize: 12, overflow: 'auto' }}
-                  variant="body2"
+                  sx={{
+                    bgcolor: 'action.hover',
+                    borderRadius: 1,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    maxHeight: 280,
+                    overflow: 'auto',
+                    p: 1.5,
+                  }}
                 >
                   {JSON.stringify(launchQuery.data.queues, null, 2)}
-                </Typography>
+                </Box>
               </>
             ) : null}
           </Stack>
