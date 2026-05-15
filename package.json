@@ -19,7 +19,9 @@
     "dev:api": "npm run dev:api -w backend",
     "dev:worker": "npm run dev:worker -w backend",
     "setup:google-oauth": "bash scripts/setup-google-oauth-gcloud.sh",
-    "setup:setu": "node scripts/configure-setu-env.mjs"
+    "setup:setu": "node scripts/configure-setu-env.mjs",
+    "db:backup": "bash scripts/db-backup.sh",
+    "db:restore": "bash scripts/db-restore.sh"
   },
   "repository": {
     "type": "git",

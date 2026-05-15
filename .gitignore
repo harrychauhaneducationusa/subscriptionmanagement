@@ -12,5 +12,9 @@ frontend/node_modules/
 backend/node_modules/
 playwright-report/
 test-results/
+# Local DB dumps (manifest + scripts are committed)
+backups/dumps/*.sql
+backups/dumps/*.sql.gz
+!backups/dumps/.gitkeep
 blob-report/
 playwright/.cache/
