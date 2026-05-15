@@ -11,8 +11,10 @@ import {
   Typography,
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import * as React from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { trackProductEvent } from '../lib/productAnalytics'
 import { getStoredSession } from '../lib/session'
 import { AppLayout } from '../layouts/AppLayout'
 
@@ -72,6 +74,7 @@ export function NotificationsPage() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['notifications'] }),
       queryClient.invalidateQueries({ queryKey: ['notification-preferences'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-summary'] }),
     ])
 
   const readMutation = useMutation({
@@ -103,6 +106,14 @@ export function NotificationsPage() {
     },
     onSuccess: invalidateNotifications,
   })
+
+  React.useEffect(() => {
+    if (!session?.sessionId) {
+      return
+    }
+
+    void trackProductEvent('notification.inbox.view')
+  }, [session?.sessionId])
 
   if (!session) {
     return <Navigate replace to="/session" />

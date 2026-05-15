@@ -84,7 +84,7 @@ export function AuthCallbackPage() {
     <PublicLayout>
       <Card>
         <CardContent sx={{ p: 3.5 }}>
-          <Stack spacing={2} alignItems="center">
+          <Stack spacing={2} sx={{ alignItems: 'center' }}>
             <Typography variant="h2">Completing sign-in</Typography>
             {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
             {!error && sessionId && (draftQuery.isLoading || finalizeQuery.isLoading) ? (

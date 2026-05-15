@@ -245,6 +245,32 @@ export async function syncNotificationsForUser(
   }
 }
 
+/**
+ * Lightweight unread count for nav badges. Does not run notification sync; open the inbox to refresh specs.
+ */
+export async function getUnreadInAppNotificationCount(householdId: string, userId: string) {
+  const pool = getDatabasePool()
+
+  if (!pool) {
+    const summary = await listNotificationsForUser(householdId, userId)
+    return { unreadCount: summary.unreadCount }
+  }
+
+  const result = await pool.query<{ total: string }>(
+    `
+      select count(*)::int as total
+      from notifications
+      where household_id = $1
+        and user_id = $2
+        and channel = 'in_app'
+        and delivery_state = 'sent'
+    `,
+    [householdId, userId],
+  )
+
+  return { unreadCount: Number(result.rows[0]?.total ?? 0) }
+}
+
 export async function listNotificationsForUser(householdId: string, userId: string) {
   const notifications = await loadNotificationsForUser(householdId, userId)
   const now = Date.now()

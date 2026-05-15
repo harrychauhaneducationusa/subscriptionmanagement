@@ -1,4 +1,5 @@
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
+import Badge from '@mui/material/Badge'
 import {
   AppBar,
   Box,
@@ -8,14 +9,35 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material'
+import { useQuery } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
+import { api } from '../lib/api'
 import { clearStoredSession, getStoredSession } from '../lib/session'
+
+type UnreadSummaryResponse = {
+  data: {
+    unreadCount: number
+  }
+}
 
 export function AppLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
   const session = getStoredSession()
+
+  const unreadQuery = useQuery({
+    queryKey: ['notifications', 'unread-summary'],
+    queryFn: async () => {
+      const response = await api.get<UnreadSummaryResponse>('/v1/notifications/unread-summary')
+      return response.data.data.unreadCount
+    },
+    enabled: Boolean(session?.sessionId),
+    staleTime: 25_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const unread = unreadQuery.data ?? 0
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -44,15 +66,22 @@ export function AppLayout({ children }: PropsWithChildren) {
               >
                 Bank link
               </Button>
-              <Button
-                color={location.pathname === '/app/notifications' ? 'primary' : 'inherit'}
-                component={RouterLink}
-                size="small"
-                to="/app/notifications"
-                variant={location.pathname === '/app/notifications' ? 'contained' : 'outlined'}
+              <Badge
+                color="primary"
+                invisible={unread < 1}
+                overlap="rectangular"
+                badgeContent={unread > 99 ? '99+' : unread}
               >
-                Notifications
-              </Button>
+                <Button
+                  color={location.pathname === '/app/notifications' ? 'primary' : 'inherit'}
+                  component={RouterLink}
+                  size="small"
+                  to="/app/notifications"
+                  variant={location.pathname === '/app/notifications' ? 'contained' : 'outlined'}
+                >
+                  Notifications
+                </Button>
+              </Badge>
             </Stack>
           </Stack>
           <Stack spacing={0.75} sx={{ alignItems: 'flex-end' }}>

@@ -22,7 +22,8 @@ const inMemoryEvents: Array<
   }
 > = []
 
-const keyLaunchEvents = [
+/** Funnel and readiness metrics surfaced on `/v1/health/launch-readiness`. */
+export const launchReadinessEventNames = [
   'auth.request_otp.success',
   'auth.verify_otp.success',
   'auth.verify_otp.failure',
@@ -31,9 +32,11 @@ const keyLaunchEvents = [
   'auth.verify_email_otp.failure',
   'auth.google_sign_in.success',
   'onboarding.household_created',
+  'onboarding.draft.save',
   'bank_link.start',
   'bank_link.success',
   'bank_link.failure',
+  'bank_link.screen.view',
   'manual_recurring.create',
   'recurring_candidate.confirm',
   'recurring_candidate.dismiss',
@@ -41,10 +44,19 @@ const keyLaunchEvents = [
   'notification.read',
   'notification.dismiss',
   'notification.snooze',
+  'notification.inbox.view',
   'recommendation.action.accept',
   'recommendation.action.dismiss',
   'recommendation.action.snooze',
 ] as const
+
+/** Client `POST /v1/analytics/events` may only record these names (session-authenticated). */
+export const clientIngestibleProductEventNames = [
+  'notification.inbox.view',
+  'bank_link.screen.view',
+] as const
+
+const clientIngestibleSet = new Set<string>(clientIngestibleProductEventNames)
 
 export async function recordProductEvent(event: ProductEvent) {
   const createdAt = new Date().toISOString()
@@ -92,7 +104,7 @@ export async function getLaunchReadinessAnalyticsSummary() {
 
   if (!pool) {
     const counts: Record<string, number> = Object.fromEntries(
-      keyLaunchEvents.map((eventName) => [eventName, 0]),
+      launchReadinessEventNames.map((eventName) => [eventName, 0]),
     )
 
     for (const event of inMemoryEvents) {
@@ -111,11 +123,11 @@ export async function getLaunchReadinessAnalyticsSummary() {
       where event_name = any($1::varchar[])
       group by event_name
     `,
-    [keyLaunchEvents],
+    [launchReadinessEventNames],
   )
 
   const counts: Record<string, number> = Object.fromEntries(
-    keyLaunchEvents.map((eventName) => [eventName, 0]),
+    launchReadinessEventNames.map((eventName) => [eventName, 0]),
   )
 
   for (const row of result.rows) {
@@ -123,6 +135,10 @@ export async function getLaunchReadinessAnalyticsSummary() {
   }
 
   return counts
+}
+
+export function isClientIngestibleProductEvent(eventName: string) {
+  return clientIngestibleSet.has(eventName)
 }
 
 function toNumber(value: string | number) {

@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import { env } from './config/env.js'
 import { passport } from './config/passport.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
+import { analyticsRouter } from './modules/analytics/analytics.routes.js'
 import { aggregationRouter } from './modules/aggregation/aggregation.routes.js'
 import {
   assignRequestContext,
@@ -44,6 +45,7 @@ export function createApp() {
   app.use('/v1/households', householdsRouter)
   app.use('/v1/onboarding', onboardingRouter)
   app.use('/v1/recurring', recurringRouter)
+  app.use('/v1/analytics', analyticsRouter)
   app.use('/v1/insights', insightsRouter)
   app.use('/v1/notifications', notificationsRouter)
   app.use('/v1/notification-preferences', notificationPreferencesRouter)

@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as React from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
+import { trackProductEvent } from '../lib/productAnalytics'
 import { getStoredSession } from '../lib/session'
 import { AppLayout } from '../layouts/AppLayout'
 
@@ -84,6 +85,14 @@ export function BankLinkPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [institutionName, setInstitutionName] = React.useState(institutionOptions[0])
   const consentId = searchParams.get('consentId')
+
+  React.useEffect(() => {
+    if (!session?.sessionId) {
+      return
+    }
+
+    void trackProductEvent('bank_link.screen.view')
+  }, [session?.sessionId])
 
   const linksQuery = useQuery({
     queryKey: ['institution-links'],

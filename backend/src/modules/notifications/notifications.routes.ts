@@ -8,6 +8,7 @@ import { refreshNotificationsForUser } from './notifications.service.js'
 import {
   dismissNotification,
   getNotificationPreferences,
+  getUnreadInAppNotificationCount,
   listNotificationsForUser,
   markNotificationRead,
   snoozeNotification,
@@ -29,6 +30,22 @@ const snoozeSchema = z.object({
 
 export const notificationsRouter = Router()
 notificationsRouter.use(requireSession)
+
+notificationsRouter.get('/unread-summary', async (request, response) => {
+  const session = request.authSession
+  const householdId = session?.defaultHouseholdId
+
+  if (!session || !householdId) {
+    throw new ApiError(
+      400,
+      'HOUSEHOLD_CONTEXT_REQUIRED',
+      'An active household is required before notification counts can be loaded',
+    )
+  }
+
+  const summary = await getUnreadInAppNotificationCount(householdId, session.userId)
+  sendData(request, response, summary)
+})
 
 notificationsRouter.get('/', async (request, response) => {
   const session = request.authSession

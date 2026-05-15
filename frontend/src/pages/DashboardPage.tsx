@@ -196,6 +196,14 @@ export function DashboardPage() {
     enabled: Boolean(session?.sessionId),
   })
 
+  React.useEffect(() => {
+    if (!summaryQuery.isSuccess) {
+      return
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-summary'] })
+  }, [summaryQuery.isSuccess, summaryQuery.dataUpdatedAt, queryClient])
+
   const feedQuery = useQuery({
     queryKey: ['insight-feed'],
     queryFn: async () => {
