@@ -1,0 +1,40 @@
+{
+  "name": "subscriptionmanagement",
+  "version": "1.0.0",
+  "description": "This repository contains the product strategy artifact for **SubSense AI**, an AI-powered subscription intelligence and recurring expense management platform.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "concurrently -n frontend,api,worker -c blue,green,magenta \"npm run dev -w frontend\" \"npm run dev:api -w backend\" \"npm run dev:worker -w backend\"",
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "check": "npm run typecheck -w frontend && npm run typecheck -w backend",
+    "test": "npm run test -w frontend && npm run test -w backend",
+    "typecheck": "npm run typecheck -w frontend && npm run typecheck -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:api": "npm run dev:api -w backend",
+    "dev:worker": "npm run dev:worker -w backend",
+    "setup:google-oauth": "bash scripts/setup-google-oauth-gcloud.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harrychauhaneducationusa/subscriptionmanagement.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/harrychauhaneducationusa/subscriptionmanagement/issues"
+  },
+  "homepage": "https://github.com/harrychauhaneducationusa/subscriptionmanagement#readme",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

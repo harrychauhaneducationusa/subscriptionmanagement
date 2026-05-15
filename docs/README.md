@@ -21,7 +21,7 @@ The current product direction is:
 |---|---|
 | `product/` | Core product documentation, scope, and requirements |
 | `strategy/` | Market, positioning, monetization, and business planning artifacts |
-| `architecture/` | Business-facing architecture and platform design documentation |
+| `architecture/` | Business-facing architecture and platform design documentation, including scalability and reliability (`architecture/scalability-and-reliability.md`: starter SLOs, Railway layout) |
 | `roadmap/` | Delivery planning, release phases, and execution sequencing |
 | `reference/` | Repo conventions, document map, and future supporting references |
 
@@ -30,7 +30,7 @@ The current product direction is:
 1. Read `../BRD.md` for the full product and business narrative.
 2. Use `product/` for core feature and requirements breakdowns.
 3. Use `strategy/` for market, positioning, and revenue planning.
-4. Use `architecture/` for platform structure and integration guidance.
+4. Use `architecture/` for platform structure, integration guidance, and scalability or reliability targets (`architecture/scalability-and-reliability.md`).
 5. Use `roadmap/` for phase planning and delivery sequencing.
 
 ## Intended evolution

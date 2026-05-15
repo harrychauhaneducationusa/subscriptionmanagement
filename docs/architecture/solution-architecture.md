@@ -244,3 +244,7 @@ The right target is:
 - future-ready partner API boundaries
 
 That gives you the speed advantages of your proven stack without importing the architectural debt that would be risky in a recurring-finance product.
+
+## Related documents
+
+- `scalability-and-reliability.md` — horizontal scaling, connection and queue discipline, rate limiting expectations, and reliability posture for growth beyond the MVP cohort

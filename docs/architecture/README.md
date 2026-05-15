@@ -20,6 +20,7 @@ The current architecture overview lives inside `../../BRD.md`, including:
 - `data-model-overview.md` - high-level fintech domain and entity model
 - `integration-landscape.md` - external system boundaries, provider responsibilities, and fallback design
 - `security-and-compliance-controls.md` - launch-ready control framework for trust, privacy, consent, and auditability
+- `scalability-and-reliability.md` - horizontal scale, capacity discipline, rate limiting, and operational reliability expectations
 - `ai-governance.md` - rules and guardrails for grounded, safe, evidence-backed AI usage
 
 ## Purpose
@@ -31,3 +32,4 @@ Use this folder for documents that translate product strategy into:
 - integration dependencies
 - data flow expectations
 - trust, security, and compliance design
+- scalability, reliability, and growth-stage operational expectations
