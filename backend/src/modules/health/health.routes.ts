@@ -3,9 +3,7 @@ import { checkDatabaseHealth } from '../../config/database.js'
 import { metricsRegistry } from '../../config/metrics.js'
 import { checkRedisHealth } from '../../config/redis.js'
 import { ApiError, sendData, sendError } from '../../lib/http.js'
-import { getLaunchReadinessAnalyticsSummary } from '../analytics/analytics.service.js'
-import { getNotificationOperationalSummary } from '../notifications/notifications.store.js'
-import { queues } from '../../queues/registry.js'
+import { getLaunchReadinessPublicSnapshot } from './launchReadiness.service.js'
 
 export const healthRouter = Router()
 
@@ -61,38 +59,6 @@ healthRouter.get('/metrics', async (_request, response) => {
 })
 
 healthRouter.get('/health/launch-readiness', async (request, response) => {
-  const [database, redis, analytics, notifications, queueSnapshot] = await Promise.all([
-    checkDatabaseHealth(),
-    checkRedisHealth(),
-    getLaunchReadinessAnalyticsSummary(),
-    getNotificationOperationalSummary(),
-    getQueueSnapshot(),
-  ])
-
-  sendData(request, response, {
-    status: database.status === 'available' && redis.status === 'available' ? 'healthy' : 'degraded',
-    services: {
-      database: database.status,
-      redis: redis.status,
-    },
-    analytics,
-    notifications,
-    queues: queueSnapshot,
-  })
+  const snapshot = await getLaunchReadinessPublicSnapshot()
+  sendData(request, response, snapshot)
 })
-
-async function getQueueSnapshot() {
-  const entries = await Promise.all(
-    Object.entries(queues).map(async ([name, queue]) => {
-      if (!queue) {
-        return [name, null] as const
-      }
-
-      const counts = await queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed')
-
-      return [name, counts] as const
-    }),
-  )
-
-  return Object.fromEntries(entries)
-}

@@ -6,6 +6,7 @@ import PauseCircleOutlineRoundedIcon from '@mui/icons-material/PauseCircleOutlin
 import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded'
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -18,7 +19,7 @@ import {
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as React from 'react'
-import { Link as RouterLink, Navigate } from 'react-router-dom'
+import { Link as RouterLink, Navigate, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { getStoredSession } from '../lib/session'
 import { AppLayout } from '../layouts/AppLayout'
@@ -187,6 +188,9 @@ export function DashboardPage() {
     Record<string, Partial<CandidateDraft>>
   >({})
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [deepLinkHighlight, setDeepLinkHighlight] = React.useState<string | null>(null)
+
   const summaryQuery = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: async () => {
@@ -203,6 +207,52 @@ export function DashboardPage() {
 
     void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-summary'] })
   }, [summaryQuery.isSuccess, summaryQuery.dataUpdatedAt, queryClient])
+
+  React.useEffect(() => {
+    const focus = searchParams.get('focus')
+    const target = searchParams.get('target')
+
+    if (!focus || !target || !summaryQuery.isSuccess || !summaryQuery.data) {
+      return
+    }
+
+    const elementId =
+      focus === 'recommendation'
+        ? `dashboard-recommendation-${target}`
+        : focus === 'renewal'
+          ? `dashboard-renewal-${target}`
+          : null
+
+    if (!elementId) {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const el = document.getElementById(elementId)
+
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setDeepLinkHighlight(elementId)
+        window.setTimeout(() => {
+          setDeepLinkHighlight(null)
+        }, 4500)
+      }
+
+      const next = new URLSearchParams(searchParams)
+      next.delete('focus')
+      next.delete('target')
+      next.delete('kind')
+      setSearchParams(next, { replace: true })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [
+    searchParams,
+    setSearchParams,
+    summaryQuery.isSuccess,
+    summaryQuery.data,
+    summaryQuery.dataUpdatedAt,
+  ])
 
   const feedQuery = useQuery({
     queryKey: ['insight-feed'],
@@ -932,12 +982,28 @@ export function DashboardPage() {
                 <Stack spacing={1}>
                   {summaryQuery.data.summary.upcomingRenewals.length ? (
                     summaryQuery.data.summary.upcomingRenewals.map((entry) => (
-                      <Typography key={entry.id} color="text.secondary" variant="body2">
-                        {entry.title} due on{' '}
-                        {entry.nextOccurrenceAt
-                          ? new Date(entry.nextOccurrenceAt).toLocaleDateString()
-                          : 'date pending'}
-                      </Typography>
+                      <Box
+                        id={`dashboard-renewal-${entry.id}`}
+                        key={entry.id}
+                        sx={
+                          deepLinkHighlight === `dashboard-renewal-${entry.id}`
+                            ? {
+                                borderRadius: 1,
+                                outline: '2px solid',
+                                outlineColor: 'primary.main',
+                                outlineOffset: '6px',
+                                px: 0.5,
+                              }
+                            : undefined
+                        }
+                      >
+                        <Typography color="text.secondary" variant="body2">
+                          {entry.title} due on{' '}
+                          {entry.nextOccurrenceAt
+                            ? new Date(entry.nextOccurrenceAt).toLocaleDateString()
+                            : 'date pending'}
+                        </Typography>
+                      </Box>
                     ))
                   ) : (
                     <Typography color="text.secondary" variant="body2">
@@ -976,8 +1042,18 @@ export function DashboardPage() {
                 {summaryQuery.data.recommendations.length ? (
                   summaryQuery.data.recommendations.map((entry) => (
                     <Alert
+                      id={`dashboard-recommendation-${entry.id}`}
                       key={entry.id}
                       severity={entry.recommendationType === 'monitor' ? 'warning' : 'info'}
+                      sx={
+                        deepLinkHighlight === `dashboard-recommendation-${entry.id}`
+                          ? {
+                              outline: '2px solid',
+                              outlineColor: 'primary.main',
+                              outlineOffset: '6px',
+                            }
+                          : undefined
+                      }
                     >
                       <Stack spacing={1.25}>
                         <Stack spacing={0.35}>

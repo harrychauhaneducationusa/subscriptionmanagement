@@ -75,7 +75,7 @@ function buildNotificationSpecs(
       triggerEntityId: recommendation.id,
       title: recommendation.title,
       message: recommendation.message,
-      deepLink: '/app/dashboard',
+      deepLink: `/app/dashboard?focus=recommendation&target=${encodeURIComponent(recommendation.id)}`,
     }),
   )
 
@@ -96,7 +96,7 @@ function buildNotificationSpecs(
         message: renewal.nextOccurrenceAt
           ? `${renewal.title} is due on ${new Date(renewal.nextOccurrenceAt).toLocaleDateString()}.`
           : `${renewal.title} needs a due date review.`,
-        deepLink: '/app/dashboard',
+        deepLink: `/app/dashboard?focus=renewal&target=${encodeURIComponent(renewal.id)}&kind=${encodeURIComponent(renewal.kind)}`,
       }),
     )
 
@@ -109,7 +109,7 @@ function buildNotificationSpecs(
         triggerEntityId: link.id,
         title: `${link.institutionName} needs attention`,
         message: link.lastFailureReason ?? 'Refresh or repair the bank connection to keep insights current.',
-        deepLink: '/app/bank-link',
+        deepLink: `/app/bank-link?focus=link&target=${encodeURIComponent(link.id)}`,
       }),
     )
 

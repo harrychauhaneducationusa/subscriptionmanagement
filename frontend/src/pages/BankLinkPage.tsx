@@ -4,6 +4,7 @@ import BuildCircleRoundedIcon from '@mui/icons-material/BuildCircleRounded'
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded'
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -84,6 +85,7 @@ export function BankLinkPage() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [institutionName, setInstitutionName] = React.useState(institutionOptions[0])
+  const [linkHighlightId, setLinkHighlightId] = React.useState<string | null>(null)
   const consentId = searchParams.get('consentId')
 
   React.useEffect(() => {
@@ -126,6 +128,36 @@ export function BankLinkPage() {
       void queryClient.invalidateQueries({ queryKey: ['institution-links'] })
     }
   }, [consentQuery.data, queryClient])
+
+  React.useEffect(() => {
+    const focus = searchParams.get('focus')
+    const target = searchParams.get('target')
+
+    if (focus !== 'link' || !target || !linksQuery.isSuccess || !linksQuery.data?.links.length) {
+      return
+    }
+
+    const elementId = `bank-link-${target}`
+
+    const frame = window.requestAnimationFrame(() => {
+      const el = document.getElementById(elementId)
+
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setLinkHighlightId(elementId)
+        window.setTimeout(() => {
+          setLinkHighlightId(null)
+        }, 4500)
+      }
+
+      const next = new URLSearchParams(searchParams)
+      next.delete('focus')
+      next.delete('target')
+      setSearchParams(next, { replace: true })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [linksQuery.isSuccess, linksQuery.data, linksQuery.dataUpdatedAt, searchParams, setSearchParams])
 
   const startConsentMutation = useMutation({
     mutationFn: async () => {
@@ -334,9 +366,24 @@ export function BankLinkPage() {
             ) : null}
 
             {linksQuery.data?.links.map((link, index) => (
-              <Stack key={link.id} spacing={1.25}>
-                {index > 0 ? <Divider /> : null}
-                <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1 }}>
+              <Box
+                id={`bank-link-${link.id}`}
+                key={link.id}
+                sx={
+                  linkHighlightId === `bank-link-${link.id}`
+                    ? {
+                        borderRadius: 1,
+                        outline: '2px solid',
+                        outlineColor: 'primary.main',
+                        outlineOffset: '6px',
+                        px: 0.25,
+                      }
+                    : undefined
+                }
+              >
+                <Stack spacing={1.25}>
+                  {index > 0 ? <Divider /> : null}
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1 }}>
                   <Stack spacing={0.5}>
                     <Typography sx={{ fontWeight: 700 }} variant="body1">
                       {link.institutionName}
@@ -374,7 +421,8 @@ export function BankLinkPage() {
                     Repair
                   </Button>
                 </Stack>
-              </Stack>
+                </Stack>
+              </Box>
             ))}
           </Stack>
         </CardContent>

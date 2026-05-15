@@ -13,6 +13,7 @@ import {
 } from './middleware/requestContext.js'
 import { authRouter } from './modules/auth/auth.routes.js'
 import { healthRouter } from './modules/health/health.routes.js'
+import { internalRouter } from './modules/internal/internal.routes.js'
 import { householdsRouter } from './modules/households/households.routes.js'
 import { insightsRouter } from './modules/insights/insights.routes.js'
 import {
@@ -40,6 +41,7 @@ export function createApp() {
   app.use(recordRequestMetrics)
 
   app.use('/v1', healthRouter)
+  app.use('/v1/internal', internalRouter)
   app.use('/v1/aggregation', aggregationRouter)
   app.use('/v1/auth', authRouter)
   app.use('/v1/households', householdsRouter)

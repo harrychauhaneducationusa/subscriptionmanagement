@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { OnboardingPage } from './pages/OnboardingPage'
+import { OpsPage } from './pages/OpsPage'
 import { SessionPage } from './pages/SessionPage'
 
 export const router = createBrowserRouter([
@@ -35,5 +36,9 @@ export const router = createBrowserRouter([
   {
     path: '/app/notifications',
     element: <NotificationsPage />,
+  },
+  {
+    path: '/app/ops',
+    element: <OpsPage />,
   },
 ])

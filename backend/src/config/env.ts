@@ -71,6 +71,14 @@ const envSchema = z.object({
   NOTIFICATION_EMAIL_MODE: z.enum(['mock', 'disabled', 'smtp']).default('mock'),
   NOTIFICATION_EMAIL_FROM: z.string().email().default('hello@subsense.local'),
   NOTIFICATION_EMAIL_TEST_RECIPIENT: z.string().email().default('sandbox@subsense.local'),
+  /**
+   * When set, `GET /v1/internal/launch-readiness` requires header `x-internal-ops-token` to match.
+   * In production this must be set so aggregate funnel data is not exposed to authenticated end users alone.
+   */
+  INTERNAL_OPS_TOKEN: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().min(8).optional(),
+  ),
 })
 
 const parsedEnv = envSchema.safeParse(process.env)

@@ -25,6 +25,8 @@ export function AppLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
   const session = getStoredSession()
+  const showOpsNav =
+    import.meta.env.DEV || import.meta.env.VITE_SHOW_OPS_NAV === 'true'
 
   const unreadQuery = useQuery({
     queryKey: ['notifications', 'unread-summary'],
@@ -82,6 +84,17 @@ export function AppLayout({ children }: PropsWithChildren) {
                   Notifications
                 </Button>
               </Badge>
+              {showOpsNav ? (
+                <Button
+                  color={location.pathname === '/app/ops' ? 'primary' : 'inherit'}
+                  component={RouterLink}
+                  size="small"
+                  to="/app/ops"
+                  variant={location.pathname === '/app/ops' ? 'contained' : 'outlined'}
+                >
+                  Ops
+                </Button>
+              ) : null}
             </Stack>
           </Stack>
           <Stack spacing={0.75} sx={{ alignItems: 'flex-end' }}>

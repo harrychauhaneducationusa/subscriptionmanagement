@@ -22,7 +22,7 @@ const inMemoryEvents: Array<
   }
 > = []
 
-/** Funnel and readiness metrics surfaced on `/v1/health/launch-readiness`. */
+/** Funnel and readiness metrics surfaced on `GET /v1/internal/launch-readiness` (authenticated + ops token in prod). */
 export const launchReadinessEventNames = [
   'auth.request_otp.success',
   'auth.verify_otp.success',
