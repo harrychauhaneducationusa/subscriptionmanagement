@@ -289,6 +289,131 @@ export async function listRecentNormalizedTransactions(householdId: string, limi
   }))
 }
 
+export type LinkedSpendTrend = {
+  state: 'insufficient_data' | 'ready'
+  recent30DayDebitTotal: number
+  prior30DayDebitTotal: number
+  direction: 'up' | 'down' | 'flat'
+  percentChange: number | null
+  message: string
+}
+
+/**
+ * Compares linked-account debit volume (normalized amounts) in the last 30 days vs the prior 30 days.
+ * Used for the Stage 5 dashboard trend strip; requires ingested normalized transactions.
+ */
+export async function getLinkedSpendTrendForHousehold(householdId: string): Promise<LinkedSpendTrend> {
+  const pool = getDatabasePool()
+
+  if (!pool) {
+    return {
+      state: 'insufficient_data',
+      recent30DayDebitTotal: 0,
+      prior30DayDebitTotal: 0,
+      direction: 'flat',
+      percentChange: null,
+      message: 'Database is not configured; linked spend trends are unavailable.',
+    }
+  }
+
+  const now = Date.now()
+  const nowIso = new Date(now).toISOString()
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+  const windowStartIso = new Date(now - 2 * thirtyDaysMs).toISOString()
+  const midIso = new Date(now - thirtyDaysMs).toISOString()
+
+  const result = await pool.query<{
+    tx_count: string | number
+    recent30: string | number
+    prior30: string | number
+  }>(
+    `
+      select
+        count(*)::int as tx_count,
+        coalesce(
+          sum(
+            case
+              when rt.direction = 'debit'
+                and rt.occurred_at >= $3::timestamptz
+                and rt.occurred_at <= $4::timestamptz
+              then nt.amount::numeric
+              else 0
+            end
+          ),
+          0
+        ) as recent30,
+        coalesce(
+          sum(
+            case
+              when rt.direction = 'debit'
+                and rt.occurred_at >= $2::timestamptz
+                and rt.occurred_at < $3::timestamptz
+              then nt.amount::numeric
+              else 0
+            end
+          ),
+          0
+        ) as prior30
+      from normalized_transactions nt
+      join raw_transactions rt on rt.id = nt.raw_transaction_id
+      where nt.household_id = $1
+        and rt.occurred_at >= $2::timestamptz
+        and rt.occurred_at <= $4::timestamptz
+    `,
+    [householdId, windowStartIso, midIso, nowIso],
+  )
+
+  const row = result.rows[0]
+  const txCount = Number(row?.tx_count ?? 0)
+  const recent30 = Math.round(toNumber(row?.recent30 ?? 0))
+  const prior30 = Math.round(toNumber(row?.prior30 ?? 0))
+
+  if (txCount === 0) {
+    return {
+      state: 'insufficient_data',
+      recent30DayDebitTotal: 0,
+      prior30DayDebitTotal: 0,
+      direction: 'flat',
+      percentChange: null,
+      message:
+        'No linked transactions in the last 60 days. Use Connect bank data (mock flow) and refresh to populate trends.',
+    }
+  }
+
+  const epsilon = 1
+  let direction: 'up' | 'down' | 'flat' = 'flat'
+
+  if (recent30 > prior30 + epsilon) {
+    direction = 'up'
+  } else if (recent30 + epsilon < prior30) {
+    direction = 'down'
+  }
+
+  let percentChange: number | null = null
+
+  if (prior30 > 0) {
+    percentChange = Math.round(((recent30 - prior30) / prior30) * 1000) / 10
+  } else if (recent30 > 0) {
+    percentChange = null
+  }
+
+  const changeLabel =
+    percentChange === null
+      ? prior30 === 0 && recent30 > 0
+        ? 'new linked activity in the last 30 days'
+        : 'stable versus the prior window'
+      : `${percentChange > 0 ? '+' : ''}${percentChange}% vs prior 30 days`
+
+  return {
+    state: 'ready',
+    recent30DayDebitTotal: recent30,
+    prior30DayDebitTotal: prior30,
+    direction,
+    percentChange,
+    message: `Linked debit volume: Rs ${recent30} in the last 30 days vs Rs ${prior30} in the prior 30 days (${changeLabel}).`,
+  }
+}
+
 async function getOrCreateMerchantProfile(descriptorNormalized: string) {
   const pool = getDatabasePool()
 

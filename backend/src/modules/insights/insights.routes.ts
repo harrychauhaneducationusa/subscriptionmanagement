@@ -66,6 +66,7 @@ insightsRouter.get('/dashboard-summary', async (request, response) => {
     summary: data.summary,
     recommendations: data.recommendations,
     freshness: data.freshness,
+    linkedSpendTrend: data.linkedSpendTrend,
   })
 })
 

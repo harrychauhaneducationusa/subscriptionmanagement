@@ -75,6 +75,14 @@ type DashboardSummaryResponse = {
     freshness: {
       message: string
     }
+    linkedSpendTrend: {
+      state: 'insufficient_data' | 'ready'
+      recent30DayDebitTotal: number
+      prior30DayDebitTotal: number
+      direction: 'up' | 'down' | 'flat'
+      percentChange: number | null
+      message: string
+    }
   }
 }
 
@@ -412,6 +420,19 @@ export function DashboardPage() {
                 label={`Open recommendations: ${summaryQuery.data?.summary.openRecommendationCount ?? 0}`}
               />
             </Stack>
+
+            {summaryQuery.data?.linkedSpendTrend ? (
+              <Alert
+                severity={summaryQuery.data.linkedSpendTrend.state === 'ready' ? 'success' : 'info'}
+              >
+                <Typography sx={{ fontWeight: 600 }} variant="body2">
+                  Linked spend trend (mock bank data when available)
+                </Typography>
+                <Typography sx={{ mt: 0.5 }} color="text.secondary" variant="body2">
+                  {summaryQuery.data.linkedSpendTrend.message}
+                </Typography>
+              </Alert>
+            ) : null}
 
             {summaryQuery.data ? (
               <Alert severity="info">{summaryQuery.data.freshness.message}</Alert>

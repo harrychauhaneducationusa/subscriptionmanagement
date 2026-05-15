@@ -1,5 +1,6 @@
 import type { QueryResultRow } from 'pg'
 import { getDatabasePool } from '../../config/database.js'
+import { getLinkedSpendTrendForHousehold } from '../transactions/transactions.store.js'
 import { listRecurringCandidates } from '../recurring/candidates.store.js'
 import { listRecurringItems, type RecurringListItem } from '../recurring/recurring.store.js'
 
@@ -129,12 +130,14 @@ export async function getDashboardInsightData(householdId: string) {
   const openRecommendations = recommendations.filter((recommendation) => recommendation.status === 'open')
   const summary = buildSummary(activeItems, pendingCandidates.length, openRecommendations.length)
   const feed = await refreshInsightFeedForHousehold(householdId, summary, openRecommendations)
+  const linkedSpendTrend = await getLinkedSpendTrendForHousehold(householdId)
 
   return {
     summary,
     recommendations: openRecommendations,
     feed,
     freshness: buildFreshness(summary),
+    linkedSpendTrend,
   }
 }
 
