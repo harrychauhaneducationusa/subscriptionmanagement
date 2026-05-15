@@ -10,3 +10,7 @@ backend/dist/
 frontend/dist/
 frontend/node_modules/
 backend/node_modules/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
