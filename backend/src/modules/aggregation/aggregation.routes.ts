@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import { z } from 'zod'
+import { logger } from '../../config/logger.js'
 import { isAggregationSessionMockEnabled } from '../../config/env.js'
 import { requireSession } from '../../middleware/requireSession.js'
 import { rateLimitRedis } from '../../middleware/rateLimitRedis.js'
@@ -7,14 +8,16 @@ import { requireAggregationCallbackSecret } from '../../middleware/requireAggreg
 import { ApiError, sendData } from '../../lib/http.js'
 import { recordProductEvent } from '../analytics/analytics.service.js'
 import { recordAuditEvent } from '../audit/audit.service.js'
+import { getAggregationProviderAdapter } from './aggregation.adapterRegistry.js'
+import { parseProviderCallbackPayload } from './callbackPayload.js'
 import {
   createConsentSession,
   getConsentState,
   listInstitutionLinks,
+  resolveInternalConsentId,
   startInstitutionLinkSync,
 } from './aggregation.store.js'
 import { enqueueAggregationLifecycleJob } from './aggregation.jobs.js'
-import { mockSetuProviderAdapter } from './providers/mockSetu.provider.js'
 import type { ParsedProviderCallback } from './providers/provider.types.js'
 
 const createConsentSchema = z.object({
@@ -46,8 +49,23 @@ aggregationRouter.post(
   setuCallbackLimiter,
   requireAggregationCallbackSecret,
   async (request, response) => {
-    const callback = mockSetuProviderAdapter.parseCallback(request.body)
-    await handleSetuCallback(request, response, callback)
+    const parsed = parseProviderCallbackPayload(request.body)
+    const internalConsentId = await resolveInternalConsentId(parsed.consentId)
+
+    if (!internalConsentId) {
+      throw new ApiError(
+        404,
+        'CONSENT_NOT_FOUND',
+        'No consent matched this callback reference; verify provider_consent_ref is stored after Create Consent',
+      )
+    }
+
+    const normalized: ParsedProviderCallback = {
+      ...parsed,
+      consentId: internalConsentId,
+    }
+
+    await handleSetuCallback(request, response, normalized)
   },
 )
 
@@ -105,6 +123,13 @@ aggregationRouter.post('/consents', async (request, response) => {
     scope: payload.scope,
   })
 
+  const adapter = getAggregationProviderAdapter()
+  const redirect = await adapter.buildConsentRedirect({
+    consentId: consent.id,
+    institutionName: consent.institutionName,
+    returnPath: `/app/bank-link?consentId=${consent.id}`,
+  })
+
   await recordAuditEvent({
     id: `aud_${consent.id}`,
     action: 'aggregation.consent.create',
@@ -132,11 +157,7 @@ aggregationRouter.post('/consents', async (request, response) => {
   sendData(request, response, {
     consent,
     linkPreview: link,
-    redirect: mockSetuProviderAdapter.buildConsentRedirect({
-      consentId: consent.id,
-      institutionName: consent.institutionName,
-      returnPath: `/app/bank-link?consentId=${consent.id}`,
-    }),
+    redirect,
   }, 201)
 })
 
@@ -293,16 +314,23 @@ async function handleSetuCallback(
     eventType: callback.eventType,
   })
 
-  await recordProductEvent({
-    eventName:
-      callback.eventType === 'consent.approved'
-        ? 'bank_link.success'
-        : 'bank_link.failure',
-    properties: {
-      consentId: callback.consentId,
-      eventType: callback.eventType,
-    },
-  })
+  try {
+    await recordProductEvent({
+      eventName:
+        callback.eventType === 'consent.approved'
+          ? 'bank_link.success'
+          : 'bank_link.failure',
+      properties: {
+        consentId: callback.consentId,
+        eventType: callback.eventType,
+      },
+    })
+  } catch (error) {
+    logger.warn(
+      { error, consentId: callback.consentId, eventType: callback.eventType },
+      'recordProductEvent failed after aggregation callback; response still succeeds',
+    )
+  }
 
   sendData(request, response, {
     accepted: enqueueResult.accepted,

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { QueryResultRow } from 'pg'
+import type { PoolClient, QueryResultRow } from 'pg'
 import { getDatabasePool } from '../../config/database.js'
 import type { ConsentCallbackEvent } from './providers/provider.types.js'
 
@@ -31,6 +31,7 @@ export type Consent = {
   issuedAt: string | null
   expiresAt: string | null
   revokedAt: string | null
+  providerConsentRef: string | null
   createdAt: string
   updatedAt: string
 }
@@ -65,6 +66,7 @@ type ConsentRow = QueryResultRow & {
   issued_at: string | Date | null
   expires_at: string | Date | null
   revoked_at: string | Date | null
+  provider_consent_ref: string | null
   created_at: string | Date
   updated_at: string | Date
 }
@@ -103,6 +105,7 @@ export async function createConsentSession(input: {
     issuedAt: null,
     expiresAt: null,
     revokedAt: null,
+    providerConsentRef: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   }
@@ -134,9 +137,9 @@ export async function createConsentSession(input: {
     await pool.query(
       `
         insert into consents (
-          id, household_id, provider, institution_name, purpose, scope, status, issued_at, expires_at, revoked_at, created_at, updated_at
+          id, household_id, provider, institution_name, purpose, scope, status, issued_at, expires_at, revoked_at, provider_consent_ref, created_at, updated_at
         )
-        values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12)
+        values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13)
       `,
       [
         consent.id,
@@ -149,6 +152,7 @@ export async function createConsentSession(input: {
         consent.issuedAt,
         consent.expiresAt,
         consent.revokedAt,
+        consent.providerConsentRef,
         consent.createdAt,
         consent.updatedAt,
       ],
@@ -182,6 +186,67 @@ export async function createConsentSession(input: {
   }
 
   return { consent, link }
+}
+
+export async function setConsentProviderReference(consentId: string, providerConsentRef: string) {
+  const pool = getDatabasePool()
+  const timestamp = new Date().toISOString()
+
+  if (!pool) {
+    const consent = consents.get(consentId)
+
+    if (!consent) {
+      return
+    }
+
+    consents.set(consentId, {
+      ...consent,
+      providerConsentRef,
+      updatedAt: timestamp,
+    })
+    return
+  }
+
+  await pool.query(
+    `
+      update consents
+      set provider_consent_ref = $2, updated_at = $3
+      where id = $1
+    `,
+    [consentId, providerConsentRef, timestamp],
+  )
+}
+
+export async function resolveInternalConsentId(rawConsentId: string): Promise<string | null> {
+  if (rawConsentId.startsWith('con_')) {
+    const pool = getDatabasePool()
+
+    if (!pool) {
+      return consents.has(rawConsentId) ? rawConsentId : null
+    }
+
+    const exists = await pool.query(`select 1 from consents where id = $1 limit 1`, [rawConsentId])
+    return exists.rowCount ? rawConsentId : null
+  }
+
+  const pool = getDatabasePool()
+
+  if (!pool) {
+    const match = [...consents.values()].find((consent) => consent.providerConsentRef === rawConsentId)
+    return match?.id ?? null
+  }
+
+  const result = await pool.query<{ id: string }>(
+    `
+      select id
+      from consents
+      where provider_consent_ref = $1
+      limit 1
+    `,
+    [rawConsentId],
+  )
+
+  return result.rows[0]?.id ?? null
 }
 
 export async function getConsentState(householdId: string, consentId: string) {
@@ -341,11 +406,14 @@ export async function processConsentCallback(
 
   const nextState = buildCallbackState(state.consent, state.link, eventType)
 
-  await pool.query('begin')
+  const client = await pool.connect()
 
   try {
-    await pool.query(
-      `
+    await client.query('begin')
+
+    try {
+      await client.query(
+        `
         update consents
         set
           status = $2,
@@ -355,18 +423,18 @@ export async function processConsentCallback(
           updated_at = $6
         where id = $1
       `,
-      [
-        nextState.consent.id,
-        nextState.consent.status,
-        nextState.consent.issuedAt,
-        nextState.consent.expiresAt,
-        nextState.consent.revokedAt,
-        nextState.consent.updatedAt,
-      ],
-    )
+        [
+          nextState.consent.id,
+          nextState.consent.status,
+          nextState.consent.issuedAt,
+          nextState.consent.expiresAt,
+          nextState.consent.revokedAt,
+          nextState.consent.updatedAt,
+        ],
+      )
 
-    await pool.query(
-      `
+      await client.query(
+        `
         update institution_links
         set
           link_status = $2,
@@ -376,24 +444,32 @@ export async function processConsentCallback(
           updated_at = $6
         where id = $1
       `,
-      [
-        nextState.link.id,
-        nextState.link.linkStatus,
-        nextState.link.lastSuccessfulSyncAt,
-        nextState.link.lastFailureReason,
-        nextState.link.repairRequired,
-        nextState.link.updatedAt,
-      ],
-    )
+        [
+          nextState.link.id,
+          nextState.link.linkStatus,
+          nextState.link.lastSuccessfulSyncAt,
+          nextState.link.lastFailureReason,
+          nextState.link.repairRequired,
+          nextState.link.updatedAt,
+        ],
+      )
 
-    if (eventType === 'consent.approved') {
-      await ensureBankAccountForLink(nextState.link.id, nextState.link.householdId, nextState.link.updatedAt)
+      if (eventType === 'consent.approved') {
+        await ensureBankAccountForLink(
+          nextState.link.id,
+          nextState.link.householdId,
+          nextState.link.updatedAt,
+          client,
+        )
+      }
+
+      await client.query('commit')
+    } catch (error) {
+      await client.query('rollback')
+      throw error
     }
-
-    await pool.query('commit')
-  } catch (error) {
-    await pool.query('rollback')
-    throw error
+  } finally {
+    client.release()
   }
 
   return {
@@ -529,9 +605,32 @@ async function getConsentStateById(consentId: string) {
   const pool = getDatabasePool()
 
   if (!pool) {
-    const consent = consents.get(consentId) ?? null
-    const link = [...links.values()].find((item) => item.consentId === consentId) ?? null
+    let consent = consents.get(consentId) ?? null
+
+    if (!consent) {
+      consent = [...consents.values()].find((item) => item.providerConsentRef === consentId) ?? null
+    }
+
+    const link = consent
+      ? ([...links.values()].find((item) => item.consentId === consent.id) ?? null)
+      : null
     return consent && link ? { consent, link } : null
+  }
+
+  const idLookup = await pool.query<{ id: string }>(
+    `
+      select id
+      from consents
+      where id = $1 or provider_consent_ref = $1
+      limit 1
+    `,
+    [consentId],
+  )
+
+  const internalId = idLookup.rows[0]?.id
+
+  if (!internalId) {
+    return null
   }
 
   const consentResult = await pool.query<ConsentRow>(
@@ -541,7 +640,7 @@ async function getConsentStateById(consentId: string) {
       where id = $1
       limit 1
     `,
-    [consentId],
+    [internalId],
   )
 
   const consentRow = consentResult.rows[0]
@@ -557,7 +656,7 @@ async function getConsentStateById(consentId: string) {
       where consent_id = $1
       limit 1
     `,
-    [consentId],
+    [internalId],
   )
 
   const linkRow = linkResult.rows[0]
@@ -638,14 +737,15 @@ async function ensureBankAccountForLink(
   institutionLinkId: string,
   householdId: string,
   timestamp: string,
+  client?: PoolClient,
 ) {
-  const pool = getDatabasePool()
+  const executor = client ?? getDatabasePool()
 
-  if (!pool) {
+  if (!executor) {
     return
   }
 
-  const accountExists = await pool.query(
+  const accountExists = await executor.query(
     `
       select 1
       from bank_accounts
@@ -659,7 +759,7 @@ async function ensureBankAccountForLink(
     return
   }
 
-  await pool.query(
+  await executor.query(
     `
       insert into bank_accounts (
         id, institution_link_id, household_id, account_type, masked_account_reference, provider_account_id, account_status, created_at, updated_at
@@ -689,6 +789,7 @@ function mapConsentRow(row: ConsentRow): Consent {
     issuedAt: row.issued_at ? new Date(row.issued_at).toISOString() : null,
     expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
     revokedAt: row.revoked_at ? new Date(row.revoked_at).toISOString() : null,
+    providerConsentRef: row.provider_consent_ref ?? null,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   }

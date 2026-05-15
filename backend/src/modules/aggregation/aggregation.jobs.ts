@@ -40,11 +40,15 @@ export async function enqueueAggregationLifecycleJob(job: AggregationLifecycleJo
           }
         : queueRetention
 
-    await queues.aggregationLifecycle.add(job.type, job, jobOptions)
+    try {
+      await queues.aggregationLifecycle.add(job.type, job, jobOptions)
 
-    return {
-      accepted: true,
-      mode: 'queued' as const,
+      return {
+        accepted: true,
+        mode: 'queued' as const,
+      }
+    } catch (error) {
+      logger.warn({ error, jobType: job.type }, 'aggregation lifecycle queue enqueue failed; processing inline')
     }
   }
 

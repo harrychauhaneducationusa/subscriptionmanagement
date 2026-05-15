@@ -45,6 +45,51 @@ const envSchema = z.object({
    * (for staging). Development and test always allow the session mock route.
    */
   ENABLE_AGGREGATION_SESSION_MOCK: parseBool(false),
+  /**
+   * `mock` — local mock consent + redirect (default).
+   * `setu` — Create Consent via Setu AA HTTP API and accept Setu webhooks on `/v1/aggregation/callbacks/setu`.
+   */
+  AGGREGATION_PROVIDER: z.enum(['mock', 'setu']).default('mock'),
+  /** Base URL for Setu AA / Bridge HTTP APIs (required when `AGGREGATION_PROVIDER=setu`). */
+  SETU_AA_BASE_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().url().optional(),
+  ),
+  SETU_AA_CREATE_CONSENT_PATH: z.string().default('/v2/consent'),
+  /** OAuth token URL when using client id/secret (default Setu UAT). Run `npm run setup:setu` to configure. */
+  SETU_AA_TOKEN_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().url().default('https://uat.setu.co/api/v2/auth/token'),
+  ),
+  SETU_AA_CLIENT_ID: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().optional(),
+  ),
+  SETU_AA_CLIENT_SECRET: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().optional(),
+  ),
+  SETU_AA_PRODUCT_INSTANCE_ID: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().optional(),
+  ),
+  /** Optional static Bearer token; if unset, API uses client id/secret against `SETU_AA_TOKEN_URL`. */
+  SETU_AA_API_KEY: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().optional(),
+  ),
+  SETU_AA_AUTH_HEADER: z.string().default('Authorization'),
+  SETU_AA_CUSTOMER_VUA: z.string().default('9999999999@setu'),
+  SETU_AA_CUSTOMER_MOBILE: z.string().default('9999999999'),
+  SETU_AA_FIU_ID: z.string().default('subsense-fiu-placeholder'),
+  SETU_AA_SCHEMA_VERSION: z.string().default('2.1.0'),
+  /**
+   * Browser redirect after Create Consent. Placeholders: `{{handle}}` = ConsentHandle, `{{returnUrl}}` = URL-encoded return path.
+   * Replace with the URL Setu documents for your product instance.
+   */
+  SETU_AA_WEB_REDIRECT_TEMPLATE: z
+    .string()
+    .default('https://bridge.setu.co/aa/consent?consentHandle={{handle}}&redirect={{returnUrl}}'),
   ENABLE_GOOGLE_OAUTH: parseBool(false),
   GOOGLE_CLIENT_ID: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),

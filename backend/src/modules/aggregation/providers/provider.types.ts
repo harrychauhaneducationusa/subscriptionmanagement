@@ -25,6 +25,6 @@ export interface AggregationProviderAdapter {
     consentId: string
     institutionName: string
     returnPath: string
-  }): ConsentRedirectDescriptor
+  }): Promise<ConsentRedirectDescriptor>
   parseCallback(payload: unknown): ParsedProviderCallback
 }

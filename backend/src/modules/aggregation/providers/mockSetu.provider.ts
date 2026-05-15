@@ -9,7 +9,7 @@ const callbackSchema = z.object({
 export const mockSetuProviderAdapter: AggregationProviderAdapter = {
   provider: 'setu_aa',
   providerName: 'Setu AA (mock)',
-  buildConsentRedirect(input) {
+  async buildConsentRedirect(input) {
     const params = new URLSearchParams({
       consentId: input.consentId,
       institutionName: input.institutionName,

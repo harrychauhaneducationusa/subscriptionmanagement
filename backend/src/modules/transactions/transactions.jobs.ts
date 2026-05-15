@@ -15,26 +15,34 @@ export type TransactionJob =
 
 export async function enqueueTransactionJob(job: TransactionJob) {
   if (job.type === 'link.ingest' && queues.transactionIngestion) {
-    await queues.transactionIngestion.add(job.type, job, {
-      removeOnComplete: 100,
-      removeOnFail: 100,
-    })
+    try {
+      await queues.transactionIngestion.add(job.type, job, {
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      })
 
-    return {
-      accepted: true,
-      mode: 'queued' as const,
+      return {
+        accepted: true,
+        mode: 'queued' as const,
+      }
+    } catch (error) {
+      logger.warn({ error, jobType: job.type }, 'transaction ingestion queue enqueue failed; processing inline')
     }
   }
 
   if (job.type === 'raw.normalize' && queues.transactionNormalization) {
-    await queues.transactionNormalization.add(job.type, job, {
-      removeOnComplete: 100,
-      removeOnFail: 100,
-    })
+    try {
+      await queues.transactionNormalization.add(job.type, job, {
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      })
 
-    return {
-      accepted: true,
-      mode: 'queued' as const,
+      return {
+        accepted: true,
+        mode: 'queued' as const,
+      }
+    } catch (error) {
+      logger.warn({ error, jobType: job.type }, 'transaction normalization queue enqueue failed; processing inline')
     }
   }
 

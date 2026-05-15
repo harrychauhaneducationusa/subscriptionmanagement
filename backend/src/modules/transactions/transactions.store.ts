@@ -414,6 +414,15 @@ export async function getLinkedSpendTrendForHousehold(householdId: string): Prom
   }
 }
 
+function isPgUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: string }).code === '23505'
+  )
+}
+
 async function getOrCreateMerchantProfile(descriptorNormalized: string) {
   const pool = getDatabasePool()
 
@@ -448,10 +457,12 @@ async function getOrCreateMerchantProfile(descriptorNormalized: string) {
   const merchantType = inferMerchantType(descriptorNormalized)
   const categoryDefault = inferCategory(descriptorNormalized)
 
-  await pool.query('begin')
+  const client = await pool.connect()
 
   try {
-    await pool.query(
+    await client.query('begin')
+
+    await client.query(
       `
         insert into merchant_profiles (
           id,
@@ -467,7 +478,7 @@ async function getOrCreateMerchantProfile(descriptorNormalized: string) {
       [merchantId, displayName, merchantType, categoryDefault, 0.85],
     )
 
-    await pool.query(
+    await client.query(
       `
         insert into merchant_aliases (
           id,
@@ -482,17 +493,37 @@ async function getOrCreateMerchantProfile(descriptorNormalized: string) {
       [`mal_${randomUUID()}`, merchantId, descriptorNormalized, descriptorNormalized],
     )
 
-    await pool.query('commit')
-  } catch (error) {
-    await pool.query('rollback')
-    throw error
-  }
+    await client.query('commit')
 
-  return {
-    id: merchantId,
-    display_name: displayName,
-    merchant_type: merchantType,
-    category_default: categoryDefault,
+    return {
+      id: merchantId,
+      display_name: displayName,
+      merchant_type: merchantType,
+      category_default: categoryDefault,
+    }
+  } catch (error) {
+    await client.query('rollback').catch(() => {})
+
+    if (isPgUniqueViolation(error)) {
+      const retry = await pool.query<MerchantProfileRow>(
+        `
+          select mp.id, mp.display_name, mp.merchant_type, mp.category_default
+          from merchant_aliases ma
+          join merchant_profiles mp on mp.id = ma.merchant_profile_id
+          where ma.descriptor_normalized = $1
+          limit 1
+        `,
+        [descriptorNormalized],
+      )
+
+      if (retry.rows[0]) {
+        return retry.rows[0]
+      }
+    }
+
+    throw error
+  } finally {
+    client.release()
   }
 }
 
