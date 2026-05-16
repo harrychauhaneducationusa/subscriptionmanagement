@@ -2,6 +2,19 @@
   "schemaVersion": 1,
   "backups": [
     {
+      "id": "subsense-20260516T013923Z-66b9cb6",
+      "createdAt": "2026-05-16T01:39:23.799Z",
+      "dumpUtc": "20260516T013923Z",
+      "file": "backups/dumps/subsense-20260516T013923Z-66b9cb6.sql.gz",
+      "format": "plain-sql-gzip",
+      "gitCommit": "66b9cb6a1b2d1060edd0834fbbc3b8aafc781891",
+      "gitBranch": "main",
+      "migrationCount": "10",
+      "sizeBytes": 85594,
+      "note": "After main merge: Plaid + link_sync_schedule migrations (000010–000011)",
+      "restoreHint": "git checkout 66b9cb6a1b2d1060edd0834fbbc3b8aafc781891 && ./scripts/db-restore.sh backups/dumps/subsense-20260516T013923Z-66b9cb6.sql.gz"
+    },
+    {
       "id": "subsense-20260515T164330Z-028cbe7",
       "createdAt": "2026-05-15T16:43:31.096Z",
       "dumpUtc": "20260515T164330Z",
