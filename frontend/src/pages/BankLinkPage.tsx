@@ -18,10 +18,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as React from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getApiErrorMessage } from '../lib/api'
 import { trackProductEvent } from '../lib/productAnalytics'
 import { getStoredSession } from '../lib/session'
+import { PlaidLinkLauncher } from '../components/PlaidLinkLauncher'
 import { AppLayout } from '../layouts/AppLayout'
+import { readPlaidLinkToken, storePlaidLinkToken } from '../lib/plaidLinkStorage'
 
 type LinksResponse = {
   data: {
@@ -66,6 +68,7 @@ type ConsentResponse = {
       redirect_url: string
       return_path: string
       status: string
+      link_token?: string
     }
     institutionLink?: {
       id: string
@@ -78,15 +81,28 @@ type ConsentResponse = {
   }
 }
 
-const institutionOptions = ['HDFC Bank', 'ICICI Bank', 'Axis Bank', 'SBI']
+const indiaInstitutionOptions = ['HDFC Bank', 'ICICI Bank', 'Axis Bank', 'SBI']
+/** Plaid Link picks the real institution; this label is for SubSense records only. */
+const PLAID_INSTITUTION_LABEL = 'US bank account (via Plaid)'
+
+const aggregationProvider = import.meta.env.VITE_AGGREGATION_PROVIDER ?? 'mock'
+const isPlaidMode = aggregationProvider === 'plaid'
+const defaultInstitutionName = isPlaidMode ? PLAID_INSTITUTION_LABEL : indiaInstitutionOptions[0]
+
+const showStageChips = import.meta.env.DEV || import.meta.env.VITE_SHOW_STAGE_CHIPS === 'true'
 
 export function BankLinkPage() {
   const session = getStoredSession()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [institutionName, setInstitutionName] = React.useState(institutionOptions[0])
+  const [institutionName, setInstitutionName] = React.useState(defaultInstitutionName)
   const [linkHighlightId, setLinkHighlightId] = React.useState<string | null>(null)
+  const [plaidLinkToken, setPlaidLinkToken] = React.useState<string | null>(null)
+  const [plaidError, setPlaidError] = React.useState<string | null>(null)
   const consentId = searchParams.get('consentId')
+  const oauthStateId = searchParams.get('oauth_state_id')
+  const isPlaidOAuthReturn = Boolean(oauthStateId && consentId)
+  const receivedRedirectUri = isPlaidOAuthReturn ? window.location.href : undefined
 
   React.useEffect(() => {
     if (!session?.sessionId) {
@@ -121,6 +137,22 @@ export function BankLinkPage() {
       return response.data.data
     },
     enabled: Boolean(consentId && session?.sessionId),
+  })
+
+  const plaidLinkTokenQuery = useQuery({
+    queryKey: ['plaid-link-token', consentId ?? 'none'],
+    queryFn: async () => {
+      const response = await api.get<{ data: { link_token: string } }>(
+        `/v1/aggregation/consents/${consentId}/plaid-link-token`,
+      )
+      return response.data.data.link_token
+    },
+    enabled: Boolean(
+      isPlaidMode &&
+        consentId &&
+        session?.sessionId &&
+        (isPlaidOAuthReturn || consentQuery.data?.consent.status === 'pending_user_action'),
+    ),
   })
 
   React.useEffect(() => {
@@ -162,7 +194,7 @@ export function BankLinkPage() {
   const startConsentMutation = useMutation({
     mutationFn: async () => {
       const response = await api.post<ConsentResponse>('/v1/aggregation/consents', {
-        institutionName,
+        institutionName: isPlaidMode ? PLAID_INSTITUTION_LABEL : institutionName,
         purpose: 'Analyze recurring subscriptions, utilities, and connection freshness.',
         scope: ['account_summary', 'transaction_history'],
       })
@@ -171,9 +203,30 @@ export function BankLinkPage() {
     },
     onSuccess: async (data) => {
       setSearchParams({ consentId: data.consent.id })
+      setPlaidError(null)
+      const token = data.redirect?.link_token ?? null
+      if (token) {
+        storePlaidLinkToken(data.consent.id, token)
+      }
+      setPlaidLinkToken(token)
       await queryClient.invalidateQueries({ queryKey: ['institution-links'] })
     },
   })
+
+  const resolvedPlaidLinkToken =
+    plaidLinkToken ??
+    startConsentMutation.data?.redirect?.link_token ??
+    (consentId ? readPlaidLinkToken(consentId) : null) ??
+    plaidLinkTokenQuery.data ??
+    null
+
+  React.useEffect(() => {
+    if (!isPlaidOAuthReturn || !consentId) {
+      return
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ['plaid-link-token', consentId] })
+  }, [consentId, isPlaidOAuthReturn, queryClient])
 
   const callbackMutation = useMutation({
     mutationFn: async (eventType: 'consent.approved' | 'consent.failed') => {
@@ -227,6 +280,20 @@ export function BankLinkPage() {
     },
   })
 
+  const handlePlaidComplete = React.useCallback(async () => {
+    setPlaidLinkToken(null)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['institution-links'] }),
+      queryClient.invalidateQueries({ queryKey: ['recent-linked-transactions'] }),
+      consentId
+        ? queryClient.invalidateQueries({ queryKey: ['consent-state', consentId] })
+        : Promise.resolve(),
+    ])
+    if (consentId) {
+      await consentQuery.refetch()
+    }
+  }, [consentId, consentQuery, queryClient])
+
   if (!session) {
     return <Navigate replace to="/session" />
   }
@@ -236,20 +303,38 @@ export function BankLinkPage() {
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
-            <Chip
-              color="secondary"
-              icon={<AccountBalanceRoundedIcon />}
-              label="Stage 3 trust-forward linking"
-              sx={{ alignSelf: 'flex-start' }}
-            />
+            {showStageChips ? (
+              <Chip
+                color="secondary"
+                icon={<AccountBalanceRoundedIcon />}
+                label="Stage 3 trust-forward linking"
+                sx={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
             <Typography variant="h2">Connect bank data when you are ready</Typography>
             <Typography color="text.secondary" variant="body2">
               Linking is optional for phase 1. Manual recurring tracking continues to work if you
               skip this step, and you can retry later without losing household setup.
             </Typography>
+            <Alert severity="success" sx={{ bgcolor: 'rgba(0,0,0,0.03)' }}>
+              <Typography sx={{ fontWeight: 700 }} variant="subtitle2">
+                Bank-level security posture
+              </Typography>
+              <Typography sx={{ mt: 0.5 }} variant="body2">
+                Access follows explicit consent and stated purpose for recurring intelligence. Connections use
+                encryption in transit; we do not use your credentials to move money or negotiate bills on your behalf.
+                See the security architecture in the SubSense docs for full control objectives.
+              </Typography>
+            </Alert>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', py: 0.5 }}>
+              {['Streaming', 'Utilities', 'Fitness', 'Cloud'].map((label) => (
+                <Chip key={label} label={label} size="small" variant="outlined" />
+              ))}
+            </Stack>
             <Alert severity="info">
-              This is a mocked Account Aggregator scaffold: the consent and link lifecycle is real
-              inside the app, but the upstream provider flow is intentionally simulated for now.
+              {isPlaidMode
+                ? 'US bank linking uses Plaid Sandbox. After starting consent, Plaid Link opens; use test credentials user_good / pass_good.'
+                : 'Bank linking uses the configured aggregation provider (mock or Setu). Mock mode includes simulate-approval buttons below.'}
             </Alert>
           </Stack>
         </CardContent>
@@ -259,24 +344,43 @@ export function BankLinkPage() {
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Typography variant="h2">Start linking</Typography>
-            <TextField
-              label="Institution"
-              onChange={(event) => setInstitutionName(event.target.value)}
-              select
-              value={institutionName}
-            >
-              {institutionOptions.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
+            {isPlaidMode ? (
+              <Alert severity="info">
+                You will choose your bank inside Plaid Link (US Sandbox). SubSense stores a generic
+                label until Plaid returns account details.
+              </Alert>
+            ) : (
+              <TextField
+                label="Institution"
+                onChange={(event) => setInstitutionName(event.target.value)}
+                select
+                value={institutionName}
+              >
+                {indiaInstitutionOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            {startConsentMutation.isError ? (
+              <Alert severity="error">
+                {getApiErrorMessage(
+                  startConsentMutation.error,
+                  'Could not start bank link. Check that the API is running and Plaid credentials are valid.',
+                )}
+              </Alert>
+            ) : null}
             <Button
               disabled={startConsentMutation.isPending}
               onClick={() => startConsentMutation.mutate()}
               variant="contained"
             >
-              {startConsentMutation.isPending ? 'Starting consent...' : 'Start bank-link consent'}
+              {startConsentMutation.isPending
+                ? 'Starting consent...'
+                : isPlaidMode
+                  ? 'Connect with Plaid'
+                  : 'Start bank-link consent'}
             </Button>
           </Stack>
         </CardContent>
@@ -289,41 +393,73 @@ export function BankLinkPage() {
               <Typography variant="h2">Consent return flow</Typography>
               {!consentQuery.data ? (
                 <Alert severity="info">
-                  Consent session created. Use the provider callback buttons below to simulate
-                  approval or failure from the bank-side flow.
+                  {isPlaidMode
+                    ? 'Consent session created. Complete Plaid Link below to activate the connection.'
+                    : 'Consent session created. Use the provider callback buttons below to simulate approval or failure from the bank-side flow.'}
                 </Alert>
               ) : (
                 <Alert severity={consentQuery.data.consent.status === 'active' ? 'success' : 'warning'}>
                   Consent for {consentQuery.data.consent.institutionName} is now{' '}
                   {consentQuery.data.consent.status}. Connection status:{' '}
                   {consentQuery.data.institutionLink?.linkStatus}.
+                  {consentQuery.data.consent.status === 'pending_user_action' && isPlaidMode ? (
+                    <>
+                      {' '}
+                      Plaid Link did not finish for this session — use Open Plaid Link below, or scroll to
+                      Connection state for an already active link.
+                    </>
+                  ) : null}
                 </Alert>
               )}
 
-              {startConsentMutation.data?.redirect ? (
+              {isPlaidOAuthReturn ? (
                 <Alert severity="info">
-                  Redirect target prepared for {startConsentMutation.data.redirect.provider_name}:{' '}
-                  {startConsentMutation.data.redirect.redirect_url}
+                  Returning from your bank (OAuth). Click below to complete the connection in SubSense.
                 </Alert>
               ) : null}
 
-              <Stack direction="row" spacing={1}>
-                <Button
-                  disabled={callbackMutation.isPending}
-                  onClick={() => callbackMutation.mutate('consent.approved')}
-                  startIcon={<CheckCircleOutlineRoundedIcon />}
-                  variant="outlined"
-                >
-                  {callbackMutation.isPending ? 'Sending callback...' : 'Simulate provider approval'}
-                </Button>
-                <Button
-                  disabled={callbackMutation.isPending}
-                  onClick={() => callbackMutation.mutate('consent.failed')}
-                  variant="outlined"
-                >
-                  Simulate provider failure
-                </Button>
-              </Stack>
+              {resolvedPlaidLinkToken && consentId && consentQuery.data?.consent.status !== 'active' ? (
+                <Stack spacing={1}>
+                  {plaidError ? <Alert severity="error">{plaidError}</Alert> : null}
+                  <PlaidLinkLauncher
+                    autoOpen={!isPlaidOAuthReturn}
+                    consentId={consentId}
+                    linkToken={resolvedPlaidLinkToken}
+                    receivedRedirectUri={receivedRedirectUri}
+                    onError={setPlaidError}
+                    onSuccess={handlePlaidComplete}
+                  />
+                </Stack>
+              ) : null}
+
+              {startConsentMutation.data?.redirect?.redirect_url ? (
+                <Alert severity="info">
+                  Redirect prepared for {startConsentMutation.data.redirect.provider_name}:{' '}
+                  <a href={startConsentMutation.data.redirect.redirect_url} rel="noreferrer" target="_blank">
+                    Open provider flow
+                  </a>
+                </Alert>
+              ) : null}
+
+              {!isPlaidMode ? (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    disabled={callbackMutation.isPending}
+                    onClick={() => callbackMutation.mutate('consent.approved')}
+                    startIcon={<CheckCircleOutlineRoundedIcon />}
+                    variant="outlined"
+                  >
+                    {callbackMutation.isPending ? 'Sending callback...' : 'Simulate provider approval'}
+                  </Button>
+                  <Button
+                    disabled={callbackMutation.isPending}
+                    onClick={() => callbackMutation.mutate('consent.failed')}
+                    variant="outlined"
+                  >
+                    Simulate provider failure
+                  </Button>
+                </Stack>
+              ) : null}
 
               <Button
                 disabled={consentQuery.isFetching}
@@ -355,8 +491,9 @@ export function BankLinkPage() {
           <Stack spacing={2}>
             <Typography variant="h2">Connection state</Typography>
             <Typography color="text.secondary" variant="body2">
-              Active and mocked bank links surface freshness and recovery actions without blocking
-              the manual recurring flows already in the product.
+              {isPlaidMode
+                ? 'Linked US accounts show freshness and recovery actions. Older India-labelled links may remain from earlier mock or Setu tests.'
+                : 'Active and mocked bank links surface freshness and recovery actions without blocking the manual recurring flows already in the product.'}
             </Typography>
 
             {linksQuery.data?.empty_state === 'manual_only' ? (
@@ -451,7 +588,8 @@ export function BankLinkPage() {
                   {transaction.description}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
-                  {transaction.category} · Rs {transaction.amount} ·{' '}
+                  {transaction.category} · {isPlaidMode ? '$' : 'Rs '}
+                  {transaction.amount} ·{' '}
                   {new Date(transaction.occurredAt).toLocaleDateString()}
                 </Typography>
               </Stack>

@@ -20,6 +20,9 @@ The current MVP assumption is a **mobile-optimized responsive web application**,
 - `phase-1-milestones.md` - milestone-based release sequencing for the MVP
 - `acceptance-checklists.md` - launch-readiness checklist package by function
 - `personas.md` - target-segment persona pack for product, UX, messaging, and prioritization
+- `subsense-vs-rocket-money.md` - confirmed positioning vs Rocket Money, dashboard/API audit, prioritized gaps if broadening PFM scope
+
+Engineering backlog for **scheduled sync, passive notifications, snapshots, and AI orchestration** (beyond MVP milestones in this folder) lives in `../architecture/platform-evolution-implementation-plan.md`.
 
 ## Scope of this section
 

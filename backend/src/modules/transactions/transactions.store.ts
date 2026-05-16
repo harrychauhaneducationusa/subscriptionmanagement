@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import type { QueryResultRow } from 'pg'
 import { getDatabasePool } from '../../config/database.js'
+import { getLinkConsentProvider } from '../aggregation/aggregation.store.js'
+import { ingestPlaidTransactionsForLink } from './plaidIngest.js'
+import {
+  inferCategoryFromDescriptor,
+  inferMerchantTypeFromCategory,
+  recurringSignalSourceForCategory,
+  resolveTransactionCategory,
+  type RawTransactionSourcePayload,
+} from './plaidCategory.js'
 
 type BankAccountRow = QueryResultRow & {
   id: string
@@ -29,6 +38,7 @@ type RawTransactionRow = QueryResultRow & {
   direction: 'debit' | 'credit'
   occurred_at: string | Date
   ingestion_batch_id: string
+  source_payload: RawTransactionSourcePayload | string | null
 }
 
 type MerchantProfileRow = QueryResultRow & {
@@ -65,6 +75,16 @@ export type RecentTransaction = {
   category: string
   amount: number
   occurredAt: string
+}
+
+export async function ingestTransactionsForLink(linkId: string) {
+  const provider = await getLinkConsentProvider(linkId)
+
+  if (provider === 'plaid') {
+    return ingestPlaidTransactionsForLink(linkId)
+  }
+
+  return ingestMockTransactionsForLink(linkId)
 }
 
 export async function ingestMockTransactionsForLink(linkId: string) {
@@ -191,7 +211,8 @@ export async function normalizeRawTransactions(rawTransactionIds: string[]) {
         amount,
         direction,
         occurred_at,
-        ingestion_batch_id
+        ingestion_batch_id,
+        source_payload
       from raw_transactions
       where id = any($1::varchar[])
     `,
@@ -202,13 +223,17 @@ export async function normalizeRawTransactions(rawTransactionIds: string[]) {
 
   for (const row of result.rows) {
     const normalizedDescriptor = normalizeDescriptor(row.description_raw)
-    const merchant = await getOrCreateMerchantProfile(normalizedDescriptor)
+    const sourcePayload = parseSourcePayload(row.source_payload)
+    const category = resolveTransactionCategory({
+      descriptionRaw: row.description_raw,
+      sourcePayload,
+    })
+    const merchant = await getOrCreateMerchantProfile(normalizedDescriptor, category)
     const normalizedId = `ntx_${randomUUID()}`
-    const category = merchant.category_default
 
     const recurringSignals = {
       cadence_hint: inferCadenceHint(normalizedDescriptor),
-      source: 'mock_rules',
+      source: recurringSignalSourceForCategory(sourcePayload),
     }
 
     const insertResult = await pool.query(
@@ -423,7 +448,7 @@ function isPgUniqueViolation(error: unknown): boolean {
   )
 }
 
-async function getOrCreateMerchantProfile(descriptorNormalized: string) {
+async function getOrCreateMerchantProfile(descriptorNormalized: string, categoryHint?: string) {
   const pool = getDatabasePool()
 
   if (!pool) {
@@ -454,8 +479,11 @@ async function getOrCreateMerchantProfile(descriptorNormalized: string) {
 
   const merchantId = `mrc_${randomUUID()}`
   const displayName = titleCase(descriptorNormalized)
-  const merchantType = inferMerchantType(descriptorNormalized)
-  const categoryDefault = inferCategory(descriptorNormalized)
+  const categoryDefault = categoryHint ?? inferCategoryFromDescriptor(descriptorNormalized)
+  const merchantType =
+    categoryHint !== undefined
+      ? inferMerchantTypeFromCategory(categoryDefault)
+      : inferMerchantType(descriptorNormalized)
 
   const client = await pool.connect()
 
@@ -588,20 +616,22 @@ function normalizeDescriptor(descriptionRaw: string) {
   return descriptionRaw.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-function inferCategory(descriptor: string) {
-  if (descriptor.includes('netflix') || descriptor.includes('spotify')) {
-    return 'subscriptions'
+function parseSourcePayload(
+  value: RawTransactionSourcePayload | string | null | undefined,
+): RawTransactionSourcePayload | null {
+  if (!value) {
+    return null
   }
 
-  if (descriptor.includes('power')) {
-    return 'utilities'
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as RawTransactionSourcePayload
+    } catch {
+      return null
+    }
   }
 
-  if (descriptor.includes('fiber') || descriptor.includes('broadband') || descriptor.includes('internet')) {
-    return 'internet'
-  }
-
-  return 'other'
+  return value
 }
 
 function inferMerchantType(descriptor: string) {

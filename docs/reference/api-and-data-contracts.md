@@ -20,6 +20,7 @@ Use this document alongside:
 - `../architecture/solution-architecture.md`
 - `../architecture/data-model-overview.md`
 - `../architecture/integration-landscape.md`
+- `../architecture/multi-market-aggregation.md`
 - `../architecture/security-and-compliance-controls.md`
 - `../architecture/ai-governance.md`
 
@@ -71,7 +72,7 @@ This document is most useful for:
 |---|---|---|
 | `auth` | user identity, OTP verification, session state | login, verify, session retrieval, logout |
 | `households` | households, member roles, privacy scopes | create/select household, view household context |
-| `aggregation` | AA consents, institution links, bank account connection lifecycle | start link, check status, refresh, repair visibility |
+| `aggregation` | bank-link consents and institution links (Setu IN, Plaid US, mock dev) | start link, check status, refresh, repair visibility |
 | `transactions` | raw and normalized financial records, freshness state | internal query support, sync state, lineage references |
 | `merchants` | canonical merchants, aliases, category normalization | mostly internal MVP surface, supports recurring and insight APIs |
 | `recurring` | candidates, subscriptions, utility bills, confirm/dismiss/edit flows | recurring review and management APIs |
@@ -236,7 +237,8 @@ Suggested values:
 |---|---|---|
 | `id` | string | consent identifier |
 | `household_id` | string | consent belongs to household context |
-| `provider` | string | initial MVP likely `setu_aa` |
+| `provider` | string | `setu_aa` (India / Setu), `plaid` (US); stored on consent/link, not inferred from env alone |
+| `provider_consent_ref` | string nullable | external id (Setu ConsentHandle; Plaid `item_id` after exchange) |
 | `purpose` | string | user-facing purpose limitation |
 | `scope` | array | approved data scope |
 | `status` | string | see lifecycle below |
@@ -430,6 +432,14 @@ This should remain mostly internal, but lineage-aware APIs may expose references
 - `snoozed`
 - `expired`
 
+### Response extensions (API only, not DB columns)
+
+For **`GET /v1/insights/dashboard-summary`** (and **`GET /v1/insights/recommendations`** when returning the same recommendation shape), each recommendation object may include:
+
+| Field | Type | Notes |
+|---|---|---|
+| `alternatives` | array optional | Curated substitution options from the manual inventory; keyed off recurring **category** of the target subscription or utility. Each item: `id`, `label`, `priceBandLabel`, `regionNote` (optional), `disclaimer`, `source` (e.g. `manual_catalog`), `lastVerifiedAt` (ISO date), `moreInfoUrl` (optional). Omitted when no inventory match. **Not persisted** on `recommendations` rows in MVP. |
+
 ## 13. Insight event
 
 ### Minimum fields
@@ -497,10 +507,26 @@ The endpoints below are implementation-facing recommendations, not final route f
 
 ## 3. Aggregation APIs
 
+### Regional providers (India vs US)
+
+| Market | `AGGREGATION_PROVIDER` | Start link | Provider callback |
+|--------|------------------------|------------|-------------------|
+| India | `setu` | `POST /consents` → Setu Create Consent + redirect | `POST /v1/aggregation/callbacks/setu` |
+| US | `plaid` | `POST /consents` → Plaid `link_token` | `POST /v1/aggregation/plaid/exchange` |
+| Dev | `mock` | mock redirect URL | `POST .../consents/:id/mock-callback` |
+
+India and US share the same consent/link **response shapes** after ingest. Provider-specific logic stays in adapters; see `../architecture/multi-market-aggregation.md`.
+
+### Endpoints
+
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/v1/aggregation/consents` | `POST` | create consent initiation session |
+| `/v1/aggregation/consents` | `POST` | create consent initiation session (adapter: Setu, Plaid, or mock) |
 | `/v1/aggregation/consents/:id` | `GET` | fetch consent state |
+| `/v1/aggregation/consents/:id/mock-callback` | `POST` | dev-only simulate provider approval/failure |
+| `/v1/aggregation/callbacks/setu` | `POST` | **Setu only** — `CONSENT_STATUS_UPDATE` webhooks |
+| `/v1/aggregation/plaid/exchange` | `POST` | **Plaid only** — exchange `public_token` after Link |
+| `/v1/aggregation/consents/:id/plaid-link-token` | `GET` | **Plaid only** — fresh `link_token` for OAuth return / reconnect |
 | `/v1/aggregation/links` | `GET` | list institution links for current household |
 | `/v1/aggregation/links/:id/refresh` | `POST` | request a data refresh |
 | `/v1/aggregation/links/:id/repair` | `POST` | start repair or reconnect flow |
@@ -508,6 +534,7 @@ The endpoints below are implementation-facing recommendations, not final route f
 ### Response requirements
 
 - consent and link responses must expose lifecycle state separately
+- `redirect.provider_name` identifies Setu vs Plaid vs mock for the frontend
 - links must include freshness and last sync data
 - skip-linking should not be represented as an error state
 
@@ -640,11 +667,15 @@ Alternative user actions:
 
 Async work should be explicit enough that engineers can reason about queue boundaries and QA can reason about eventual consistency.
 
+### Per-link sync schedule (persistence)
+
+When migration **`000011_link_sync_schedule`** is applied, PostgreSQL holds **`link_sync_schedule`** (keyed by `institution_links.id`) with **`next_run_at`** and tier-driven baseline intervals. Each successful **`link.ingest`** job updates this row so a future scheduler can select due links without coupling to dashboard API traffic. If the table is absent (unmigrated database), ingest still succeeds and the bump is skipped (logged). Details: `../architecture/platform-evolution-implementation-plan.md` and `../architecture/data-model-overview.md`.
+
 ## 1. Required job families
 
 | Job family | Trigger | Output |
 |---|---|---|
-| `transaction_ingestion` | consent activation, refresh request, scheduled sync | raw transaction records persisted |
+| `transaction_ingestion` | consent activation, refresh request, scheduled sync (Phase 1.2 worker), completion bumps `link_sync_schedule.next_run_at` | raw transaction records persisted; per-link **next scheduled pull** updated when migration `000011` is applied |
 | `transaction_normalization` | new raw transactions | normalized transactions and merchant mapping attempts |
 | `recurring_detection` | normalized transaction updates | recurring candidates updated |
 | `recommendation_generation` | recurring changes or scheduled evaluation | recommendations refreshed |

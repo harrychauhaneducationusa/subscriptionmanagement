@@ -15,6 +15,7 @@ Additional roadmap guidance now includes:
 
 - `native-app-trigger-criteria.md` - measurable and qualitative criteria for deciding whether to build native apps after MVP validation
 - `implementation-sequence.md` - engineering-facing build order from repo bootstrap through MVP launch candidate
+- Cross-reference: `../architecture/platform-evolution-implementation-plan.md` - scheduled sync cadence, snapshots, and async evolution **after** MVP foundations
 
 ## Suggested future additions
 

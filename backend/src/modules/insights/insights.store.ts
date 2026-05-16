@@ -3,6 +3,7 @@ import { getDatabasePool } from '../../config/database.js'
 import { getLinkedSpendTrendForHousehold } from '../transactions/transactions.store.js'
 import { listRecurringCandidates } from '../recurring/candidates.store.js'
 import { listRecurringItems, type RecurringListItem } from '../recurring/recurring.store.js'
+import { listAlternativesForCategory, type SubstitutionAlternative } from './substitution_inventory.store.js'
 
 export type RecommendationType = 'cancel' | 'downgrade' | 'share' | 'bundle' | 'monitor'
 export type RecommendationTargetEntityType = 'subscription' | 'utility_bill' | 'household_bundle'
@@ -27,6 +28,8 @@ export type Recommendation = {
   snoozedUntil: string | null
   createdAt: string
   updatedAt: string
+  /** Curated substitution rows from manual inventory; not persisted on recommendation rows */
+  alternatives?: SubstitutionAlternative[]
 }
 
 export type InsightEvent = {
@@ -121,6 +124,28 @@ type RecommendationDraft = Omit<
 const recommendationStore = new Map<string, Recommendation>()
 const insightEventStore = new Map<string, InsightEvent>()
 
+function enrichRecommendationsWithAlternatives(
+  activeItems: RecurringListItem[],
+  recommendations: Recommendation[],
+): Recommendation[] {
+  const itemById = new Map(activeItems.map((item) => [item.id, item]))
+
+  return recommendations.map((rec) => {
+    if (rec.targetEntityType !== 'subscription' && rec.targetEntityType !== 'utility_bill') {
+      return rec
+    }
+    const item = itemById.get(rec.targetEntityId)
+    if (!item) {
+      return rec
+    }
+    const alternatives = listAlternativesForCategory(item.category, 3)
+    if (!alternatives.length) {
+      return rec
+    }
+    return { ...rec, alternatives }
+  })
+}
+
 export async function getDashboardInsightData(householdId: string) {
   const activeItems = (await listRecurringItems(householdId)).filter((item) => item.status === 'active')
   const pendingCandidates = await listRecurringCandidates(householdId, {
@@ -131,10 +156,11 @@ export async function getDashboardInsightData(householdId: string) {
   const summary = buildSummary(activeItems, pendingCandidates.length, openRecommendations.length)
   const feed = await refreshInsightFeedForHousehold(householdId, summary, openRecommendations)
   const linkedSpendTrend = await getLinkedSpendTrendForHousehold(householdId)
+  const recommendationsWithAlternatives = enrichRecommendationsWithAlternatives(activeItems, openRecommendations)
 
   return {
     summary,
-    recommendations: openRecommendations,
+    recommendations: recommendationsWithAlternatives,
     feed,
     freshness: buildFreshness(summary),
     linkedSpendTrend,

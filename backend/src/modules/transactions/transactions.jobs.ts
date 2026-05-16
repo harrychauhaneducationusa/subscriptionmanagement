@@ -1,7 +1,8 @@
 import { logger } from '../../config/logger.js'
 import { queues } from '../../queues/registry.js'
 import { enqueueRecurringDetectionJob } from '../recurring/recurring.jobs.js'
-import { ingestMockTransactionsForLink, normalizeRawTransactions } from './transactions.store.js'
+import { scheduleNextRunAfterIngestSuccess } from '../sync/linkSyncSchedule.store.js'
+import { ingestTransactionsForLink, normalizeRawTransactions } from './transactions.store.js'
 
 export type TransactionJob =
   | {
@@ -59,7 +60,11 @@ export async function processTransactionJob(job: TransactionJob) {
 
   switch (job.type) {
     case 'link.ingest': {
-      const result = await ingestMockTransactionsForLink(job.linkId)
+      const result = await ingestTransactionsForLink(job.linkId)
+
+      if (result) {
+        await scheduleNextRunAfterIngestSuccess(job.linkId)
+      }
 
       if (result && result.insertedRawTransactionIds.length > 0) {
         await enqueueTransactionJob({

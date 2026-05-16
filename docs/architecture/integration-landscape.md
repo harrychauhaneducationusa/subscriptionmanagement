@@ -4,7 +4,7 @@
 
 This document defines the integration boundaries for `SubSense AI`.
 
-It complements the solution architecture by answering a more specific question:
+It complements `solution-architecture.md` and the phased engineering backlog in `platform-evolution-implementation-plan.md` (scheduled sync, webhooks, snapshots) by answering a more specific question:
 
 How should the platform connect to external systems while preserving fintech trust, recurring-data quality, and future product flexibility?
 
@@ -36,12 +36,16 @@ The goal is to make clear:
 6. **Integration contracts should be replaceable**
    The platform should be able to add providers, swap vendors, or expand to partner distribution without rebuilding domain logic.
 
+7. **Regional providers are isolated adapters**
+   India and the United States use different regulated connectivity (Setu AA vs Plaid). They share internal tables and enrichment after ingest; they do not share provider credentials or callback handlers. See `multi-market-aggregation.md`.
+
 ## Landscape summary
 
 | Integration area | Primary external systems | Core purpose | MVP posture | Future evolution |
 |---|---|---|---|---|
-| Bank connectivity | `Setu AA`, participating financial institutions | ingest consented account and transaction data | critical | add broader provider abstraction if coverage expands |
-| Transaction ingestion | provider webhooks, pull refreshes, sync jobs | move source data into raw internal ledgers | critical | stronger replay, reconciliation, and SLA tooling |
+| Bank connectivity (India) | `Setu AA`, participating Indian FIPs | ingest consented account and transaction data (IN) | critical | FI data fetch completion on Setu path |
+| Bank connectivity (United States) | `Plaid`, US financial institutions | ingest linked account and transaction data (US) | POC / phased | production Plaid, optional additional US aggregators |
+| Transaction ingestion | provider webhooks, pull refreshes, sync jobs, **per-link scheduled cadence** (`link_sync_schedule`) | move source data into raw internal ledgers | critical | scheduler worker reads `next_run_at` and enqueues delta ingest (see `platform-evolution-implementation-plan.md`) |
 | Merchant intelligence | internal rules plus optional external enrichment sources | normalize merchant descriptors and improve recurring quality | critical, mostly internalized | add curated external signals if ROI is clear |
 | Notifications | email provider, browser delivery surfaces | renewals, anomalies, and recommendation prompts | critical | add deeper push and messaging channels later |
 | AI orchestration | LLM or model providers | generate grounded narratives and ranking support | valuable but non-blocking | add richer routing, personalization, and multilingual support |
@@ -57,7 +61,8 @@ flowchart TD
   worker[Worker Service]
   db[PostgreSQL]
   cache[Redis and Queue]
-  aa[Setu AA and institutions]
+  setu[Setu AA India]
+  plaid[Plaid US]
   email[Email provider]
   ai[AI model provider]
   partner[Future partner clients]
@@ -66,20 +71,32 @@ flowchart TD
   web --> api
   api --> db
   api --> cache
-  api --> aa
+  api --> setu
+  api --> plaid
   api --> partner
   cache --> worker
   worker --> db
-  worker --> aa
+  worker --> setu
+  worker --> plaid
   worker --> email
   worker --> ai
 ```
 
+## Multi-market bank connectivity
+
+| Market | Provider | Config | Callback / completion |
+|--------|----------|--------|------------------------|
+| India (`IN`) | Setu AA | `AGGREGATION_PROVIDER=setu`, `SETU_AA_*` | `POST /v1/aggregation/callbacks/setu` |
+| United States (`US`) | Plaid | `AGGREGATION_PROVIDER=plaid`, `PLAID_*` | `POST /v1/aggregation/plaid/exchange` + `transactions/sync` ingest |
+| Development | Mock | `AGGREGATION_PROVIDER=mock` | `POST .../mock-callback` |
+
+**Setu and Plaid are mutually exclusive per deployment** (or per household when `market` routing is added). Adding Plaid must not alter Setu adapter code paths. Full detail: `multi-market-aggregation.md`.
+
 ## Boundary model
 
-### 1. Account Aggregator and bank connectivity
+### 1. Account Aggregator and bank connectivity (India)
 
-This is the most trust-sensitive external integration in the MVP.
+This is the most trust-sensitive external integration for the **Indian market**.
 
 The platform should rely on `Setu AA` or an equivalent Account Aggregator integration for:
 
@@ -122,6 +139,18 @@ If AA connectivity is unavailable, the product must still allow:
 - manual utility and bill setup
 - dashboard access from user-entered recurring items
 - later bank-link retry without losing onboarding progress
+
+### 1b. US bank connectivity (Plaid) — implemented, isolated from Setu
+
+For the **United States** market, bank linking uses **Plaid** (Link, Items, Transactions API), not Setu AA.
+
+| Concern | Plaid responsibility | SubSense AI responsibility |
+|---|---|---|
+| Link UI | Plaid Link, institution credentials | embed Link, map `link_token` / `public_token` flow |
+| Account access | Items, accounts, transaction payloads | store refs, ingest to `raw_transactions`, freshness UX |
+| Webhooks | transaction updates (when enabled) | dedicated handler, not `/callbacks/setu` |
+
+India deployments **must not** enable Plaid for production Indian users. US deployments **must not** depend on Setu. Implementation guide: `multi-market-aggregation.md`.
 
 ### 2. Transaction ingestion and sync boundary
 
@@ -330,7 +359,7 @@ Users should be able to understand:
 
 ## MVP integration priorities
 
-The first integration sequence should be:
+### India (primary launch)
 
 1. OTP-based identity and session foundation
 2. household-aware onboarding and manual recurring setup
@@ -340,7 +369,14 @@ The first integration sequence should be:
 6. notification delivery for renewals and key alerts
 7. AI-backed narratives layered on top of proven deterministic outputs
 
-This order ensures the product can deliver value even if some automation layers are still maturing.
+### United States (parallel / phased — does not block India)
+
+1. ~~Plaid Sandbox POC~~ — **done**: Link, exchange, ingest, PFC category mapping (`plaidCategory.ts`)
+2. Incremental sync cursor + Plaid webhooks; encrypt `provider_access_token` before prod
+3. US household `market` routing and USD UX (when product launches US)
+4. Plaid production approval separate from Setu FIU go-live
+
+This order ensures the product can deliver value even if some automation layers are still maturing, and **US experiments do not change India Setu configuration**.
 
 ## Deliberately deferred integrations
 
@@ -357,8 +393,8 @@ The following should remain outside the MVP unless they become essential:
 
 The SubSense AI integration landscape should be built around a small number of durable boundaries:
 
-- Account Aggregator connectivity for consented financial access
-- an internal ingestion and normalization backbone
+- **Regional** bank connectivity: Setu AA (India), Plaid (US), each behind a replaceable adapter
+- an internal ingestion and normalization backbone shared by all markets
 - a dedicated merchant intelligence layer
 - abstracted notification delivery
 - AI orchestration that enhances, but does not define, recurring truth

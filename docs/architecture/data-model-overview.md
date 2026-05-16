@@ -23,6 +23,9 @@ The goal is not to finalize every column up front. The goal is to define the **c
 5. **Recommendations and insights are evidence-backed**
    Every user-facing recommendation should trace to structured facts.
 
+6. **Market-specific connectivity, market-agnostic money data**
+   India uses Setu AA; the United States uses Plaid. Both write into the same `raw_transactions` → normalization path. See `multi-market-aggregation.md`.
+
 ## Core domain entities
 
 | Domain | Entity | Purpose |
@@ -30,8 +33,9 @@ The goal is not to finalize every column up front. The goal is to define the **c
 | Identity | `users` | base user identity |
 | Households | `households` | financial unit under management |
 | Households | `household_members` | user membership and role within a household |
-| Aggregation | `consents` | AA consent records and lifecycle |
-| Aggregation | `institution_links` | institution-level link state and repair status |
+| Aggregation | `consents` | bank-link consent records (Setu AA or Plaid); lifecycle is provider-agnostic |
+| Aggregation | `institution_links` | institution-level link state and repair status; `provider` distinguishes `setu_aa` vs `plaid` |
+| Aggregation | `link_sync_schedule` | per-link **scheduled delta sync** cadence: tier (`free` / `premium`), effective interval, jitter cap, and `next_run_at` (operational; complements `institution_links.last_successful_sync_at`) |
 | Banking | `bank_accounts` | linked account metadata |
 | Transactions | `raw_transactions` | original ingested financial records |
 | Transactions | `normalized_transactions` | enriched and standardized transaction views |
@@ -56,6 +60,7 @@ flowchart TD
   householdMembers[household_members]
   consents[consents]
   institutionLinks[institution_links]
+  linkSyncSchedule[link_sync_schedule]
   bankAccounts[bank_accounts]
   rawTransactions[raw_transactions]
   normalizedTransactions[normalized_transactions]
@@ -72,6 +77,7 @@ flowchart TD
   households --> householdMembers
   households --> consents
   consents --> institutionLinks
+  institutionLinks --> linkSyncSchedule
   institutionLinks --> bankAccounts
   bankAccounts --> rawTransactions
   rawTransactions --> normalizedTransactions
@@ -151,6 +157,21 @@ Should track:
 - last successful sync
 
 This prevents the app from conflating consent artifacts with operational link health.
+
+### `link_sync_schedule`
+
+**Purpose:** drive **passive, recurring** transaction pulls per linked institution without overloading providers or tying cadence only to user logins.
+
+**Relationship:** one row per `institution_links.id` (primary key = `link_id`, foreign key to `institution_links` with cascade delete).
+
+**Suggested contents:**
+
+- `sync_tier` — baseline cadence policy (`free` vs `premium`) until billing or entitlements own this field
+- `interval_seconds_effective` — last computed interval (adaptive tuning can adjust this later)
+- `jitter_seconds_max` — upper bound on random delay spread to avoid sync storms
+- `next_run_at` — when the link becomes eligible for the next **scheduled** ingest (distinct from “last time data actually arrived,” which remains on `institution_links`)
+
+**Implementation note:** after a successful `link.ingest` job, the backend upserts this row and advances `next_run_at`. A dedicated scheduler worker (see `platform-evolution-implementation-plan.md` Phase 1.2) will query due rows and enqueue ingestion. See migration `backend/src/db/migrations/000011_link_sync_schedule.cjs`.
 
 ### `bank_accounts`
 
@@ -281,6 +302,7 @@ The minimum viable data model should prioritize:
 - household_members
 - consents
 - institution_links
+- link_sync_schedule (when migrations applied; see `platform-evolution-implementation-plan.md`)
 - bank_accounts
 - raw_transactions
 - normalized_transactions

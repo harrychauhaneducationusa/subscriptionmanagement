@@ -114,7 +114,7 @@ export async function generateCandidatesFromNormalizedTransactions(normalizedTra
   for (const row of result.rows) {
     const recurringSignals = row.recurring_signals ?? {}
     const cadenceHint = recurringSignals.cadence_hint ?? 'unknown'
-    const candidateType = inferCandidateType(row.merchant_type, row.category)
+    const candidateType = inferRecurringCandidateType(row.merchant_type, row.category)
 
     if (candidateType === 'other_recurring' || cadenceHint === 'unknown') {
       continue
@@ -551,7 +551,8 @@ function mapCandidateRow(row: CandidateRow): RecurringCandidate {
   }
 }
 
-function inferCandidateType(merchantType: string | null, category: string): CandidateType {
+/** Exported for unit tests and deterministic recurring detection rules. */
+export function inferRecurringCandidateType(merchantType: string | null, category: string): CandidateType {
   if (merchantType === 'utility' || category === 'utilities' || category === 'internet') {
     return 'utility'
   }

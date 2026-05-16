@@ -5,6 +5,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
 /**
  * Run against an already-started stack (`npm run dev` from repo root).
  * Set PLAYWRIGHT_BASE_URL / PLAYWRIGHT_API_BASE_URL if ports differ.
+ * Phone OTP E2E uses PLAYWRIGHT_DEV_OTP (default 123456); keep aligned with API `OTP_TEST_CODE`.
  */
 export default defineConfig({
   testDir: './e2e',

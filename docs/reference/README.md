@@ -4,7 +4,7 @@ This section is for supporting repository references and lightweight guidance do
 
 ## Current documents
 
-- `api-and-data-contracts.md` - implementation-facing API, entity, state, webhook, and async contract guidance
+- `api-and-data-contracts.md` - implementation-facing API, entity, state, webhook, and async contract guidance (includes **`link_sync_schedule`** / ingest cadence notes)
 
 ## Suggested future additions
 

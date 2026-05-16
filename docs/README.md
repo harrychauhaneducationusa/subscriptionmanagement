@@ -21,9 +21,9 @@ The current product direction is:
 |---|---|
 | `product/` | Core product documentation, scope, and requirements |
 | `strategy/` | Market, positioning, monetization, and business planning artifacts |
-| `architecture/` | Business-facing architecture and platform design documentation, including scalability and reliability (`architecture/scalability-and-reliability.md`: starter SLOs, Railway layout) |
+| `architecture/` | Business-facing architecture and platform design documentation, including scalability and reliability (`architecture/scalability-and-reliability.md`: starter SLOs, Railway layout). **Platform evolution** (scheduled sync cadence, snapshots, events, AI layer) is tracked in `architecture/platform-evolution-implementation-plan.md` and linked from individual architecture pages where relevant. |
 | `roadmap/` | Delivery planning, release phases, and execution sequencing |
-| `reference/` | Repo conventions, document map, and future supporting references |
+| `reference/` | Repo conventions, document map, API and async job contracts (`reference/api-and-data-contracts.md`), and future supporting references |
 
 ## Recommended reading order
 
@@ -32,6 +32,7 @@ The current product direction is:
 3. Use `strategy/` for market, positioning, and revenue planning.
 4. Use `architecture/` for platform structure, integration guidance, and scalability or reliability targets (`architecture/scalability-and-reliability.md`).
 5. Use `roadmap/` for phase planning and delivery sequencing.
+6. Use `architecture/platform-evolution-implementation-plan.md` when extending **sync, notifications, snapshots, or AI orchestration** beyond the MVP paths described in the BRD.
 
 ## Intended evolution
 

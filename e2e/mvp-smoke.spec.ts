@@ -14,7 +14,7 @@ test.describe('MVP smoke (requires `npm run dev` — API, DB, Redis, Vite)', () 
   test('landing shows primary value proposition', async ({ page }) => {
     await page.goto('/')
     await expect(
-      page.getByRole('heading', { level: 1, name: /Understand your recurring spending/i }),
+      page.getByRole('heading', { level: 1, name: /The recurring money app that works for you/i }),
     ).toBeVisible()
   })
 
@@ -28,5 +28,17 @@ test.describe('MVP smoke (requires `npm run dev` — API, DB, Redis, Vite)', () 
     await page.goto('/app/ops')
     await expect(page.getByRole('heading', { name: /Operations and funnel snapshot/i })).toBeVisible()
     await expect(page.getByText(/Overall status:/i)).toBeVisible()
+  })
+
+  test('bank link page loads after session', async ({ page }) => {
+    await page.goto('/session')
+    await page.getByRole('button', { name: /Verify OTP and create session/i }).click()
+    await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 45_000 })
+
+    await page.goto('/app/bank-link')
+    await expect(page.getByRole('heading', { name: /Connect bank data when you are ready/i })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: /Connect with Plaid|Start bank-link consent/i }),
+    ).toBeVisible()
   })
 })

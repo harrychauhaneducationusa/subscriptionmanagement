@@ -11,6 +11,7 @@
     "build": "npm run build -w frontend && npm run build -w backend",
     "check": "npm run typecheck -w frontend && npm run typecheck -w backend",
     "test": "npm run test -w frontend && npm run test -w backend",
+    "test:coverage": "npm run test:coverage -w frontend && npm run test:coverage -w backend",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:install": "playwright install chromium",
@@ -20,6 +21,9 @@
     "dev:worker": "npm run dev:worker -w backend",
     "setup:google-oauth": "bash scripts/setup-google-oauth-gcloud.sh",
     "setup:setu": "node scripts/configure-setu-env.mjs",
+    "setup:plaid": "node scripts/configure-plaid-env.mjs",
+    "sync:plaid-cli": "node scripts/sync-plaid-from-cli.mjs",
+    "backfill:plaid-categories": "node scripts/backfill-plaid-categories.mjs",
     "db:backup": "bash scripts/db-backup.sh",
     "db:restore": "bash scripts/db-restore.sh"
   },

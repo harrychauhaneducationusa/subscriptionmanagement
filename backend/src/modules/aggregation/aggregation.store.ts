@@ -23,7 +23,7 @@ export type LinkStatus =
 export type Consent = {
   id: string
   householdId: string
-  provider: 'setu_aa'
+  provider: 'setu_aa' | 'plaid'
   institutionName: string
   purpose: string
   scope: string[]
@@ -32,6 +32,7 @@ export type Consent = {
   expiresAt: string | null
   revokedAt: string | null
   providerConsentRef: string | null
+  providerAccessToken: string | null
   createdAt: string
   updatedAt: string
 }
@@ -58,7 +59,7 @@ export type ConsentCallbackResult = {
 type ConsentRow = QueryResultRow & {
   id: string
   household_id: string
-  provider: 'setu_aa'
+  provider: 'setu_aa' | 'plaid'
   institution_name: string
   purpose: string
   scope: string[]
@@ -67,6 +68,7 @@ type ConsentRow = QueryResultRow & {
   expires_at: string | Date | null
   revoked_at: string | Date | null
   provider_consent_ref: string | null
+  provider_access_token: string | null
   created_at: string | Date
   updated_at: string | Date
 }
@@ -92,12 +94,13 @@ export async function createConsentSession(input: {
   institutionName: string
   purpose: string
   scope: string[]
+  provider: 'setu_aa' | 'plaid'
 }) {
   const timestamp = new Date().toISOString()
   const consent: Consent = {
     id: `con_${randomUUID()}`,
     householdId: input.householdId,
-    provider: 'setu_aa',
+    provider: input.provider,
     institutionName: input.institutionName,
     purpose: input.purpose,
     scope: input.scope,
@@ -106,6 +109,7 @@ export async function createConsentSession(input: {
     expiresAt: null,
     revokedAt: null,
     providerConsentRef: null,
+    providerAccessToken: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   }
@@ -137,9 +141,9 @@ export async function createConsentSession(input: {
     await pool.query(
       `
         insert into consents (
-          id, household_id, provider, institution_name, purpose, scope, status, issued_at, expires_at, revoked_at, provider_consent_ref, created_at, updated_at
+          id, household_id, provider, institution_name, purpose, scope, status, issued_at, expires_at, revoked_at, provider_consent_ref, provider_access_token, created_at, updated_at
         )
-        values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13)
+        values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14)
       `,
       [
         consent.id,
@@ -153,6 +157,7 @@ export async function createConsentSession(input: {
         consent.expiresAt,
         consent.revokedAt,
         consent.providerConsentRef,
+        consent.providerAccessToken,
         consent.createdAt,
         consent.updatedAt,
       ],
@@ -186,6 +191,139 @@ export async function createConsentSession(input: {
   }
 
   return { consent, link }
+}
+
+export async function setConsentPlaidCredentials(
+  consentId: string,
+  input: { itemId: string; accessToken: string },
+) {
+  const pool = getDatabasePool()
+  const timestamp = new Date().toISOString()
+
+  if (!pool) {
+    const consent = consents.get(consentId)
+
+    if (!consent) {
+      return
+    }
+
+    consents.set(consentId, {
+      ...consent,
+      providerConsentRef: input.itemId,
+      providerAccessToken: input.accessToken,
+      updatedAt: timestamp,
+    })
+    return
+  }
+
+  await pool.query(
+    `
+      update consents
+      set provider_consent_ref = $2, provider_access_token = $3, updated_at = $4
+      where id = $1
+    `,
+    [consentId, input.itemId, input.accessToken, timestamp],
+  )
+}
+
+export async function getPlaidAccessTokenForLink(linkId: string) {
+  const pool = getDatabasePool()
+
+  if (!pool) {
+    return null
+  }
+
+  const result = await pool.query<{ provider_access_token: string | null }>(
+    `
+      select c.provider_access_token
+      from institution_links il
+      inner join consents c on c.id = il.consent_id
+      where il.id = $1 and c.provider = 'plaid'
+      limit 1
+    `,
+    [linkId],
+  )
+
+  return result.rows[0]?.provider_access_token ?? null
+}
+
+export async function getLinkConsentProvider(linkId: string): Promise<'setu_aa' | 'plaid' | null> {
+  const pool = getDatabasePool()
+
+  if (!pool) {
+    return null
+  }
+
+  const result = await pool.query<{ provider: 'setu_aa' | 'plaid' }>(
+    `
+      select c.provider
+      from institution_links il
+      inner join consents c on c.id = il.consent_id
+      where il.id = $1
+      limit 1
+    `,
+    [linkId],
+  )
+
+  return result.rows[0]?.provider ?? null
+}
+
+export async function upsertPlaidBankAccounts(input: {
+  linkId: string
+  householdId: string
+  accounts: Array<{
+    accountId: string
+    name: string
+    mask: string | null
+    subtype: string | null
+  }>
+}) {
+  const pool = getDatabasePool()
+  const timestamp = new Date().toISOString()
+
+  if (!pool) {
+    return
+  }
+
+  for (const account of input.accounts) {
+    const masked =
+      account.mask && account.mask.length > 0
+        ? `****${account.mask}`
+        : account.name.slice(0, 24)
+    const accountType = account.subtype ?? 'depository'
+
+    const existing = await pool.query(
+      `
+        select id
+        from bank_accounts
+        where institution_link_id = $1 and provider_account_id = $2
+        limit 1
+      `,
+      [input.linkId, account.accountId],
+    )
+
+    if (existing.rowCount && existing.rowCount > 0) {
+      continue
+    }
+
+    await pool.query(
+      `
+        insert into bank_accounts (
+          id, institution_link_id, household_id, account_type, masked_account_reference, provider_account_id, account_status, created_at, updated_at
+        )
+        values ($1, $2, $3, $4, $5, $6, 'active', $7, $7)
+      `,
+      [
+        `acct_${randomUUID()}`,
+        input.linkId,
+        input.householdId,
+        accountType,
+        masked,
+        account.accountId,
+        timestamp,
+      ],
+    )
+  }
 }
 
 export async function setConsentProviderReference(consentId: string, providerConsentRef: string) {
@@ -745,6 +883,21 @@ async function ensureBankAccountForLink(
     return
   }
 
+  const providerResult = await executor.query<{ provider: string }>(
+    `
+      select c.provider
+      from institution_links il
+      inner join consents c on c.id = il.consent_id
+      where il.id = $1
+      limit 1
+    `,
+    [institutionLinkId],
+  )
+
+  if (providerResult.rows[0]?.provider === 'plaid') {
+    return
+  }
+
   const accountExists = await executor.query(
     `
       select 1
@@ -790,6 +943,7 @@ function mapConsentRow(row: ConsentRow): Consent {
     expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
     revokedAt: row.revoked_at ? new Date(row.revoked_at).toISOString() : null,
     providerConsentRef: row.provider_consent_ref ?? null,
+    providerAccessToken: row.provider_access_token ?? null,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   }

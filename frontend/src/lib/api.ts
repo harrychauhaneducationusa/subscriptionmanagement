@@ -27,3 +27,16 @@ api.interceptors.request.use((config) => {
 
   return config
 })
+
+export function getApiErrorMessage(error: unknown, fallback = 'Request failed') {
+  if (axios.isAxiosError(error)) {
+    const payload = error.response?.data as { error?: { message?: string } } | undefined
+    return payload?.error?.message ?? error.message ?? fallback
+  }
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return fallback
+}

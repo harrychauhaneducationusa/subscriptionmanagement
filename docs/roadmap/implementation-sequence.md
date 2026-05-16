@@ -23,7 +23,20 @@ Use this document with:
 - `../product/phase-1-milestones.md`
 - `../architecture/solution-architecture.md`
 - `../architecture/integration-landscape.md`
+- `../architecture/multi-market-aggregation.md`
+- `../architecture/platform-evolution-implementation-plan.md` — post-MVP platform sequencing (scheduled sync, snapshots, notification decoupling, events, AI orchestration) and **regression test matrix**
 - `../reference/api-and-data-contracts.md`
+
+## Post-MVP platform hardening (engineering)
+
+After the stage-0–6 MVP spine is stable, use **`../architecture/platform-evolution-implementation-plan.md`** as the authoritative engineering backlog for:
+
+- scheduled delta sync (scheduler reading `link_sync_schedule`)
+- passive notification / digest batches
+- dashboard snapshots and decoupled recommendation recompute
+- transactional outbox and webhook idempotency
+
+This document’s **stage ordering** remains the primary guide for first demos; the platform plan layers on **without replacing** MVP scope in `../product/phase-1-milestones.md`.
 
 ## Planning principles
 
@@ -44,6 +57,9 @@ Use this document with:
 
 6. **Build evidence before polish-heavy expansion**
    The first phases should validate activation, clarity, and recurring intelligence before more ambitious packaging or partner concerns.
+
+7. **Regional bank providers are plug-in adapters, not separate products**
+   India (Setu AA) and the United States (Plaid) share one app, one schema, and one enrichment pipeline. Provider-specific code stays isolated. See `../architecture/multi-market-aggregation.md`.
 
 ## Target build posture
 
@@ -309,13 +325,52 @@ This order protects the MVP from becoming:
 - unusable for non-linked users
 - too fragile when provider coverage or flows fail
 
+## Multi-market scope (India + United States)
+
+Stage 3 in the original plan assumed a single Account Aggregator (Setu). The **target architecture** is now explicit:
+
+| Market | Provider | Config | Status in repo (baseline) |
+|--------|----------|--------|---------------------------|
+| India | Setu AA | `AGGREGATION_PROVIDER=setu` | Adapter + webhooks + Create Consent; mock transaction ingest; **FI fetch from Setu still TODO** |
+| US | Plaid | `AGGREGATION_PROVIDER=plaid` | **Implemented** — Link, exchange, `transactions/sync`, Plaid PFC category mapping |
+| Dev (both) | Mock | `AGGREGATION_PROVIDER=mock` | **Done** — full link lifecycle + mock ingest for demos |
+
+**Same application, separate adapters.** Do not build a second repo for the US. Do not merge Setu and Plaid into one provider class.
+
+### India track (primary — unchanged priority)
+
+1. Complete Setu FI data fetch into `raw_transactions` (replace mock-only ingest for `setu` links).
+2. Production Setu credentials from Bridge (India team); US developers use `mock` or shared secrets, not Bridge UI.
+3. Keep `/v1/aggregation/callbacks/setu` and all `SETU_AA_*` env vars India-only in prod.
+
+### US track (parallel POC — does not block India)
+
+Run on branch `feature/plaid-integration` while India track continues on `main` or merges independently:
+
+1. Add `plaid` to adapter registry and `env.ts`.
+2. Implement `plaidProviderAdapter` + `POST /v1/aggregation/plaid/exchange`.
+3. Plaid `transactions/sync` → existing `raw_transactions` path (Plaid links only).
+4. Plaid Link on Bank Link when `redirect.provider_name` indicates Plaid.
+5. Sandbox only until Plaid production approval.
+
+### Future: one deploy serving both markets
+
+When both countries ship from one hostname:
+
+- Add `household.market` (`IN` | `US`) and route `getAggregationProviderAdapter(market)` — do **not** rely on a single global `AGGREGATION_PROVIDER` alone.
+- Optional: `household.default_currency`, locale, and institution lists per market.
+
+Until then, **separate deployments** (India env = `setu`, US env = `plaid`) are simpler and safer.
+
 ## Backend module order
 
 1. `aggregation` consent model
 2. `aggregation` institution link model
 3. connection-state APIs
-4. webhook receiver skeleton
+4. webhook receiver skeleton (**Setu**: `/callbacks/setu`; **Plaid**: dedicated exchange route)
 5. refresh and repair orchestration
+6. **India:** Setu FI ingestion worker path
+7. **US (parallel):** Plaid item + transaction sync ingestion path
 
 ## Frontend screen order
 
@@ -692,15 +747,44 @@ The team is ready to start implementation when:
 - MVP module ownership is understood
 - the contract and migration sequence are accepted as the initial baseline
 
+## Current application state vs this plan (review snapshot)
+
+Use this when judging fit for India + US on **one** codebase.
+
+| Stage | Plan intent | Current state | India launch gap | US POC gap |
+|-------|-------------|---------------|------------------|------------|
+| 0–1 Foundation | Repo, auth, households | **Largely done** | — | — |
+| 2 Manual recurring | Value without banks | **Done** | — | — |
+| 3 Connectivity | AA / link lifecycle | **Partial** — mock + Setu consent/webhook; Plaid Link + exchange on US path | Setu real FI data | Production Plaid approval, token encryption |
+| 4 Ingestion + recurring | raw → candidates | **Done** — mock, Plaid, and linked data; Plaid categories from PFC | Needs real Setu txns | Incremental sync cursor, webhooks |
+| 5 Dashboard / insights | Actionability | **Largely done** | Content/locale INR | USD/locale |
+| 6 Notifications / ops | Retention, readiness | **Largely done** | — | — |
+
+**Conclusion:** The staged plan still fits. Stage 3 splits into two **adapter completion** efforts that feed the **same** Stage 4 pipeline. Stages 4–6 do not need duplication per country.
+
+## Combine vs separate — recommendation
+
+| Approach | Verdict |
+|----------|---------|
+| **One app, one database, provider adapters** (`mock` / `setu` / `plaid`) | **Recommended** — matches current `aggregation.adapterRegistry` direction |
+| **One deployment, both providers always on** | **Not recommended** — wrong credentials, compliance blur, harder ops |
+| **Two separate codebases** (India app vs US app) | **Not recommended** — duplicates recurring, dashboard, auth |
+| **Two deployments, same image, different env** (India `setu`, US `plaid`) | **Recommended for near term** |
+| **One deployment, `household.market` routing** | **Recommended before true dual-country GA** |
+
+**Can you integrate both Setu and Plaid?** Yes — as **sibling adapters** into the same internal model, not as one combined upstream integration.
+
 ## Final recommendation
 
 SubSense AI should be implemented in the same order that users will learn to trust it:
 
 1. safe identity and context
 2. useful manual recurring value
-3. trust-forward financial connectivity
-4. explainable recurring intelligence
-5. actionable dashboard recommendations
+3. trust-forward financial connectivity (**India: finish Setu ingest**; **US: Plaid POC in parallel on feature branch**)
+4. explainable recurring intelligence (shared — no fork per country)
+5. actionable dashboard recommendations (shared; localize per market later)
 6. measurable retention and launch readiness
 
 That sequence gives the team the best chance to reach a credible MVP quickly without undermining trust, overbuilding too early, or coupling the entire product to bank automation before the manual value path is proven.
+
+For architecture and env rules: `../architecture/multi-market-aggregation.md`.

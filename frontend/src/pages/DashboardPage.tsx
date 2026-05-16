@@ -12,6 +12,7 @@ import {
   CardContent,
   Chip,
   Divider,
+  Link,
   MenuItem,
   Stack,
   TextField,
@@ -19,7 +20,7 @@ import {
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as React from 'react'
-import { Link as RouterLink, Navigate, useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { getStoredSession } from '../lib/session'
 import { AppLayout } from '../layouts/AppLayout'
@@ -72,6 +73,16 @@ type DashboardSummaryResponse = {
       confidence: number
       assumptions: string[]
       status: 'open' | 'accepted' | 'dismissed' | 'snoozed' | 'expired'
+      alternatives?: Array<{
+        id: string
+        label: string
+        priceBandLabel: string
+        regionNote?: string
+        disclaimer: string
+        source: string
+        lastVerifiedAt: string
+        moreInfoUrl?: string
+      }>
     }>
     freshness: {
       message: string
@@ -189,6 +200,7 @@ export function DashboardPage() {
   >({})
 
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const [deepLinkHighlight, setDeepLinkHighlight] = React.useState<string | null>(null)
 
   const summaryQuery = useQuery({
@@ -253,6 +265,18 @@ export function DashboardPage() {
     summaryQuery.data,
     summaryQuery.dataUpdatedAt,
   ])
+
+  React.useEffect(() => {
+    if (location.hash !== '#recurring') {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('recurring')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [location.hash, location.pathname])
 
   const feedQuery = useQuery({
     queryKey: ['insight-feed'],
@@ -430,6 +454,9 @@ export function DashboardPage() {
     },
   })
 
+  const showStageChips =
+    import.meta.env.DEV || import.meta.env.VITE_SHOW_STAGE_CHIPS === 'true'
+
   if (!session) {
     return <Navigate replace to="/session" />
   }
@@ -440,12 +467,14 @@ export function DashboardPage() {
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Stack spacing={0.75}>
-              <Chip
-                color="primary"
-                icon={<AutorenewRoundedIcon />}
-                label="Stage 5 actionable dashboard"
-                sx={{ alignSelf: 'flex-start' }}
-              />
+              {showStageChips ? (
+                <Chip
+                  color="primary"
+                  icon={<AutorenewRoundedIcon />}
+                  label="Stage 5 actionable dashboard"
+                  sx={{ alignSelf: 'flex-start' }}
+                />
+              ) : null}
               <Typography variant="h2">Recurring intelligence with first actions</Typography>
               <Typography color="text.secondary" variant="body2">
                 Manual entries, detected recurring items, pending review work, and grounded
@@ -678,6 +707,7 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
+      <Box component="section" id="recurring" sx={{ scrollMarginTop: 5 }}>
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Stack spacing={2}>
@@ -935,6 +965,7 @@ export function DashboardPage() {
           </Stack>
         </CardContent>
       </Card>
+      </Box>
 
       {summaryQuery.data ? (
         <>
@@ -1069,6 +1100,44 @@ export function DashboardPage() {
                             Assumptions: {entry.assumptions.join(' ')}
                           </Typography>
                         </Stack>
+
+                        {entry.alternatives?.length ? (
+                          <Box sx={{ pl: 0, pt: 0.5 }}>
+                            <Typography sx={{ fontWeight: 600, fontSize: '0.75rem' }} variant="caption">
+                              Curated options to explore (manual catalog)
+                            </Typography>
+                            <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: 1, p: 0 }}>
+                              {entry.alternatives.map((alt) => (
+                                <Box
+                                  key={alt.id}
+                                  component="li"
+                                  sx={{
+                                    borderLeft: '3px solid',
+                                    borderColor: 'divider',
+                                    pl: 1.5,
+                                    py: 0.25,
+                                  }}
+                                >
+                                  <Typography sx={{ fontWeight: 600 }} variant="body2">
+                                    {alt.label}
+                                  </Typography>
+                                  <Typography color="text.secondary" variant="caption" display="block">
+                                    {alt.priceBandLabel}
+                                    {alt.regionNote ? ` · ${alt.regionNote}` : ''}
+                                  </Typography>
+                                  <Typography color="text.secondary" sx={{ fontSize: '0.7rem' }} variant="caption" display="block">
+                                    {alt.disclaimer} (verified {alt.lastVerifiedAt})
+                                  </Typography>
+                                  {alt.moreInfoUrl ? (
+                                    <Link href={alt.moreInfoUrl} rel="noopener noreferrer" target="_blank" variant="caption">
+                                      More info
+                                    </Link>
+                                  ) : null}
+                                </Box>
+                              ))}
+                            </Stack>
+                          </Box>
+                        ) : null}
 
                         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
                           <Button

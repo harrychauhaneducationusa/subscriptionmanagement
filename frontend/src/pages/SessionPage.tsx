@@ -14,7 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { useMemo, useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
@@ -45,6 +45,7 @@ const googleSignInEnabled = import.meta.env.VITE_ENABLE_GOOGLE_OAUTH === 'true'
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
 
 export function SessionPage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [tab, setTab] = useState(0)
   const [phoneNumber, setPhoneNumber] = useState('+919876543210')
@@ -69,6 +70,7 @@ export function SessionPage() {
   const completeSignIn = async (session: VerifyOtpResponse['data']['session']) => {
     const householdType = draftQuery.data?.householdType ?? undefined
     const { household } = await finalizeAuthenticatedSession(session, householdType)
+    queryClient.clear()
     setSessionSummary({
       sessionId: session.sessionId,
       phoneNumberMasked: session.phoneNumberMasked,

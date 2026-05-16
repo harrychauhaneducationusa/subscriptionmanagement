@@ -9,6 +9,7 @@ It complements:
 - `solution-architecture.md` — target stack and modular monolith direction
 - `security-and-compliance-controls.md` — trust, privacy, and control framing
 - `integration-landscape.md` — external boundaries and failure modes
+- `platform-evolution-implementation-plan.md` — scheduled sync cadence, snapshots, and worker/queue evolution beyond the MVP snapshot in this doc
 
 It is **not** a capacity guarantee or a runbook. It is the **architectural contract** engineering and operations should follow when sizing services, choosing defaults, and prioritizing hardening work.
 
@@ -41,7 +42,7 @@ The repository today aligns with a **modular monolith**:
 |-----------|------|
 | **Express API** (`backend`) | HTTP `/v1/*` routes, Zod validation, sessions, domain modules |
 | **Worker process** (`backend` worker entry) | BullMQ consumers: aggregation lifecycle, transaction ingest/normalize, recurring detection, notification dispatch |
-| **PostgreSQL** | System of record (users, sessions, households, transactions, insights, notifications, audit, analytics events, etc.) |
+| **PostgreSQL** | System of record (users, sessions, households, transactions, insights, notifications, **`link_sync_schedule`**, audit, analytics events, etc.) |
 | **Redis** | BullMQ queues; suitable extension point for **rate limiting** and **session cache** |
 | **Frontend** (Vite + React) | SPA calling the API; no server-side session in the browser beyond stored session token |
 
@@ -68,6 +69,10 @@ For early production and demos:
 - Keep **worker count** modest (1–2 replicas) unless queue depth or latency requires more.
 - Tune **`pg` pool `max` per replica** from environment (small per instance; avoid exhausting Postgres `max_connections`).
 - Prefer **PgBouncer** (or equivalent) in **transaction pooling** mode before multiplying API replicas in production—industry standard for many small connections from many Node processes.
+
+### Scheduled transaction sync (evolution)
+
+The **`link_sync_schedule`** table stores **`next_run_at`** per `institution_links` row so ingestion can move from “user-driven only” toward **time-based delta sync** without blocking HTTP requests. Scheduler workers should use **bounded batch sizes**, **leases** (future), and **provider rate limits** so queue depth stays predictable as user count grows. See `platform-evolution-implementation-plan.md` Phase 1.
 
 ### Rate limiting and abuse resistance (architecture requirement)
 

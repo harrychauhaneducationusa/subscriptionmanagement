@@ -48,8 +48,9 @@ const envSchema = z.object({
   /**
    * `mock` — local mock consent + redirect (default).
    * `setu` — Create Consent via Setu AA HTTP API and accept Setu webhooks on `/v1/aggregation/callbacks/setu`.
+   * `plaid` — Plaid Link + token exchange for US market (`/v1/aggregation/plaid/exchange`).
    */
-  AGGREGATION_PROVIDER: z.enum(['mock', 'setu']).default('mock'),
+  AGGREGATION_PROVIDER: z.enum(['mock', 'setu', 'plaid']).default('mock'),
   /** Base URL for Setu AA / Bridge HTTP APIs (required when `AGGREGATION_PROVIDER=setu`). */
   SETU_AA_BASE_URL: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -90,6 +91,27 @@ const envSchema = z.object({
   SETU_AA_WEB_REDIRECT_TEMPLATE: z
     .string()
     .default('https://bridge.setu.co/aa/consent?consentHandle={{handle}}&redirect={{returnUrl}}'),
+  /** Required when `AGGREGATION_PROVIDER=plaid`. Run `npm run setup:plaid` after Dashboard keys. */
+  PLAID_CLIENT_ID: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().optional(),
+  ),
+  PLAID_SECRET: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().optional(),
+  ),
+  PLAID_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  PLAID_PRODUCTS: z.string().default('transactions'),
+  PLAID_COUNTRY_CODES: z.string().default('US'),
+  /**
+   * OAuth redirect URI for Plaid Link (OAuth institutions only).
+   * Must be listed in Plaid Dashboard → API → Allowed redirect URIs.
+   * Leave unset for default sandbox Link (Chase user_good / pass_good) without OAuth setup.
+   */
+  PLAID_OAUTH_REDIRECT_URI: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().url().optional(),
+  ),
   ENABLE_GOOGLE_OAUTH: parseBool(false),
   GOOGLE_CLIENT_ID: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),

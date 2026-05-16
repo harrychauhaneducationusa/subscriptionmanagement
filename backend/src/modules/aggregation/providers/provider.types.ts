@@ -1,4 +1,4 @@
-export type AggregationProvider = 'setu_aa'
+export type AggregationProvider = 'setu_aa' | 'plaid'
 
 export type ConsentCallbackEvent =
   | 'consent.approved'
@@ -10,6 +10,8 @@ export type ConsentRedirectDescriptor = {
   redirect_url: string
   return_path: string
   status: 'pending_user_action'
+  /** Present when using Plaid Link (no browser redirect URL). */
+  link_token?: string
 }
 
 export type ParsedProviderCallback = {

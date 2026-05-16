@@ -3,6 +3,7 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { BankLinkPage } from './pages/BankLinkPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
+import { LearnPage } from './pages/LearnPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { OpsPage } from './pages/OpsPage'
@@ -20,6 +21,10 @@ export const router = createBrowserRouter([
   {
     path: '/session',
     element: <SessionPage />,
+  },
+  {
+    path: '/learn',
+    element: <LearnPage />,
   },
   {
     path: '/auth/callback',

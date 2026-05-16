@@ -74,7 +74,8 @@ flowchart TD
   postgres[PostgreSQL]
   redis[Redis]
   objectStore[ObjectStorage]
-  aa[AccountAggregator]
+  setu[SetuAA India]
+  plaid[Plaid US]
   notifications[EmailAndInAppNotifications]
   ai[AIOrchestration]
   partnerApi[PartnerAPI]
@@ -84,18 +85,22 @@ flowchart TD
   api --> postgres
   api --> redis
   api --> objectStore
-  api --> aa
+  api --> setu
+  api --> plaid
   api --> ai
   api --> partnerApi
   api --> redis
   redis --> worker
   worker --> postgres
   worker --> redis
-  worker --> aa
+  worker --> setu
+  worker --> plaid
   worker --> ai
   worker --> notifications
   worker --> objectStore
 ```
+
+Bank connectivity is **region-specific** (Setu for India, Plaid for US) behind replaceable adapters; ingestion and recurring logic are shared. See `multi-market-aggregation.md`. **Operational sync cadence** (per-link `next_run_at`, scheduled delta pulls) is described in `platform-evolution-implementation-plan.md` and the `link_sync_schedule` entity in `data-model-overview.md`.
 
 ## Recommended domain modules
 
@@ -104,6 +109,7 @@ flowchart TD
 | `auth` | identity, login, OTP verification, session control, step-up auth | separates user security concerns |
 | `households` | household entities, members, roles, privacy scopes | core shared-spend model |
 | `aggregation` | AA consent state, account linking, link repair, refresh lifecycle | isolates bank integration complexity |
+| `sync` | per-link ingest cadence (`link_sync_schedule`), future scheduler / lease / `sync_run` audit | separates “when to pull” from consent UI and ingest mechanics; see `platform-evolution-implementation-plan.md` |
 | `transactions` | raw ingestion, normalized ledger, freshness state, reconciliation | foundation for recurring intelligence |
 | `merchants` | merchant alias graph, normalization, classification | key to recurring detection quality |
 | `subscriptions` | recurring items, utilities, manual entries, statuses | core user-facing recurring system |
@@ -248,3 +254,4 @@ That gives you the speed advantages of your proven stack without importing the a
 ## Related documents
 
 - `scalability-and-reliability.md` — horizontal scaling, connection and queue discipline, rate limiting expectations, and reliability posture for growth beyond the MVP cohort
+- `platform-evolution-implementation-plan.md` — phased implementation (scheduled sync / `link_sync_schedule`, passive notifications, dashboard snapshots, event outbox, AI orchestration) and regression testing matrix

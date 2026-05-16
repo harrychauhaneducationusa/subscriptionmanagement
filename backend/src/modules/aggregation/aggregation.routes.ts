@@ -8,7 +8,10 @@ import { requireAggregationCallbackSecret } from '../../middleware/requireAggreg
 import { ApiError, sendData } from '../../lib/http.js'
 import { recordProductEvent } from '../analytics/analytics.service.js'
 import { recordAuditEvent } from '../audit/audit.service.js'
-import { getAggregationProviderAdapter } from './aggregation.adapterRegistry.js'
+import { getAggregationProviderAdapter, getAggregationProviderForConsent } from './aggregation.adapterRegistry.js'
+import { createPlaidLinkToken } from './plaid/plaidClient.js'
+import { completePlaidLinkExchange } from './plaid/plaidExchange.js'
+import { env } from '../../config/env.js'
 import { parseProviderCallbackPayload } from './callbackPayload.js'
 import {
   createConsentSession,
@@ -34,6 +37,11 @@ const createConsentSchema = z.object({
 
 const mockConsentCallbackSchema = z.object({
   eventType: z.enum(['consent.approved', 'consent.failed', 'consent.revoked']),
+})
+
+const plaidExchangeSchema = z.object({
+  consentId: z.string().min(1),
+  publicToken: z.string().min(1),
 })
 
 const setuCallbackLimiter = rateLimitRedis({
@@ -70,6 +78,43 @@ aggregationRouter.post(
 )
 
 aggregationRouter.use(requireSession)
+
+aggregationRouter.post('/plaid/exchange', async (request, response) => {
+  const session = request.authSession
+  const householdId = session?.defaultHouseholdId
+
+  if (!session || !householdId) {
+    throw new ApiError(
+      400,
+      'HOUSEHOLD_CONTEXT_REQUIRED',
+      'An active household is required before completing Plaid Link',
+    )
+  }
+
+  const body = plaidExchangeSchema.parse(request.body)
+  const result = await completePlaidLinkExchange({
+    householdId,
+    consentId: body.consentId,
+    publicToken: body.publicToken,
+  })
+
+  try {
+    await recordProductEvent({
+      eventName: 'bank_link.success',
+      householdId,
+      userId: session.userId,
+      sessionId: session.sessionId,
+      properties: {
+        consentId: body.consentId,
+        provider: 'plaid',
+      },
+    })
+  } catch (error) {
+    logger.warn({ error, consentId: body.consentId }, 'recordProductEvent failed after Plaid exchange')
+  }
+
+  sendData(request, response, result)
+})
 
 aggregationRouter.post('/consents/:consentId/mock-callback', async (request, response) => {
   if (!isAggregationSessionMockEnabled()) {
@@ -121,6 +166,7 @@ aggregationRouter.post('/consents', async (request, response) => {
     institutionName: payload.institutionName,
     purpose: payload.purpose,
     scope: payload.scope,
+    provider: getAggregationProviderForConsent(),
   })
 
   const adapter = getAggregationProviderAdapter()
@@ -159,6 +205,39 @@ aggregationRouter.post('/consents', async (request, response) => {
     linkPreview: link,
     redirect,
   }, 201)
+})
+
+aggregationRouter.get('/consents/:id/plaid-link-token', async (request, response) => {
+  const householdId = request.authSession?.defaultHouseholdId
+
+  if (!householdId) {
+    throw new ApiError(
+      400,
+      'HOUSEHOLD_CONTEXT_REQUIRED',
+      'An active household is required before loading Plaid Link',
+    )
+  }
+
+  if (env.AGGREGATION_PROVIDER !== 'plaid') {
+    throw new ApiError(400, 'PLAID_NOT_ENABLED', 'Plaid is not the active aggregation provider')
+  }
+
+  const state = await getConsentState(householdId, request.params.id)
+
+  if (!state) {
+    throw new ApiError(404, 'CONSENT_NOT_FOUND', 'The consent session could not be found')
+  }
+
+  if (state.consent.provider !== 'plaid') {
+    throw new ApiError(400, 'CONSENT_PROVIDER_MISMATCH', 'This consent is not a Plaid session')
+  }
+
+  const linkToken = await createPlaidLinkToken(state.consent.id)
+
+  sendData(request, response, {
+    link_token: linkToken,
+    redirect_uri: `${env.FRONTEND_URL.replace(/\/$/, '')}/app/bank-link`,
+  })
 })
 
 aggregationRouter.get('/consents/:id', async (request, response) => {
